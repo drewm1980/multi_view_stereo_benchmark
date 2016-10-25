@@ -24,11 +24,17 @@ For context, this benchmark is similar to the Middlebury Multi-View Stereo Bench
 
 A note about rigor: this is NOT a research oriented benchmark. I am developing it in one day. Think of it as a tool for us to use in communication with vendors, that is at least better than looking at one point cloud and going "meh, looks good..."
 
-# Running
+## Dependences
+I used the default pcl in ubuntu 14.04:
+sudo apt-get install libpcl-1.7-all-dev
+
+python stuff
+sudo apt-get install python3 python3-numpy
+
+## Running
 
 1. Check out this git repo
-1. Download the dataset from the google drive. The images have already been corrected for radial distortion.
-1. Write code
+1. Download the dataset from the google drive and place it as a subdirectory "data" in the root directory of this git repository.
 
 # FAQ
 

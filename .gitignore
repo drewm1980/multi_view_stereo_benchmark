@@ -3,3 +3,5 @@ CMakeFiles
 Makefile
 *.cmake
 libcompare_clouds.so
+reconstructions
+undistorted
