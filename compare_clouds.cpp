@@ -1,16 +1,31 @@
 #include <pcl/point_types.h>
 #include <pcl/io/ply_io.h>
 #include <string>
+#include <vector>
+
+using namespace std;
+using Point = pcl::PointXYZ;
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr copy_c_array_to_point_cloud(const float* array,
+                                                           int points) {
+    auto cloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    for (int i = 0; i < points * 3; i += 3) {
+        cloud->push_back(pcl::PointXYZ(array[i], array[i + 1], array[i + 2]));
+    }
+    return cloud;
+}
 
 extern "C" {
 void compare_clouds(const float* cloud1, const float* cloud2, int points1,
                     int points2) {
-    // Compare two point clouds, stored compactly in xyzxyz... format
-}
-}
+    cout << points1 << endl;
+    cout << points2 << endl;
 
-using namespace std;
-using Point = pcl::PointXYZ;
+    // Compare two point clouds, stored compactly in xyzxyz... format
+    auto cloud1_pcl = copy_c_array_to_point_cloud(cloud1, points1);
+    auto cloud2_pcl = copy_c_array_to_point_cloud(cloud2, points2);
+}
+}
 
 int main(int argc, char** argv) {
     string cloud1FileName;
