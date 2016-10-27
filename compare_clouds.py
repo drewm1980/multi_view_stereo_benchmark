@@ -29,7 +29,10 @@ def compare_clouds(cloud1, cloud2):
 
 
 if __name__=='__main__':
+    print('loading cloud 1...')
     cloud1PointData = load_ply(cloud1Path)[0][:,:3].astype(numpy.float32)
+    print('loading cloud 2...')
     cloud2PointData = load_ply(cloud2Path)[0][:,:3].astype(numpy.float32)
+    print('Calling C++ compare_clouds code from python...')
     compare_clouds(cloud1PointData, cloud2PointData)
 
