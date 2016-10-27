@@ -5,3 +5,5 @@ Makefile
 libcompare_clouds.so
 reconstructions
 undistorted
+data
+compare_clouds

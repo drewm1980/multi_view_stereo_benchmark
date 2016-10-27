@@ -35,8 +35,8 @@ int main(int argc, char** argv) {
     auto cloud1 = pcl::PointCloud<Point>::Ptr(new pcl::PointCloud<Point>);
     auto cloud2 = pcl::PointCloud<Point>::Ptr(new pcl::PointCloud<Point>);
 
-    pcl::io::loadPLYFile<Point>("pmvs_result.ply", *cloud1);
-    pcl::io::loadPLYFile<Point>("pmvs_result.ply", *cloud2);
+    pcl::io::loadPLYFile<Point>(cloud1FileName.c_str(), *cloud1);
+    pcl::io::loadPLYFile<Point>(cloud2FileName.c_str(), *cloud2);
 
     // if (cloud1->width < 20) {
     // throw std::runtime_error("Loaded point cloud contains almost no points!
