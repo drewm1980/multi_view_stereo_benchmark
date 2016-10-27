@@ -22,8 +22,9 @@ int main(int argc, char** argv) {
         cout << "No parameters passed, comparing two hard-coded paths for ply "
                 "files for debugging!" << endl;
         cloud1FileName =
-            "data/reconstructions/2016_10_24__17_43_02/reference.ply";
-        cloud2FileName = "data/reconstructions/2016_10_24__17_43_02/medium.ply";
+            "./data/reconstructions/2016_10_24__17_43_02/reference.ply";
+        cloud2FileName = 
+            "./data/reconstructions/2016_10_24__17_43_17/high_quality.ply";
     } else {
         cloud1FileName = argv[1];
         cloud2FileName = argv[2];

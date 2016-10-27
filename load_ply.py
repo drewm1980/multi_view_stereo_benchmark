@@ -18,10 +18,16 @@ def load_ply(filename, enableCaching=True):
     # Parse the header
     filename = str(filename)
     file = open(filename,'r')
+
+    header_lines = 0
+
     assert file.readline().strip() == 'ply'
+    header_lines += 1
+
     assert file.readline().strip() == 'format ascii 1.0'
+    header_lines += 1
+
     nextline = file.readline().strip()
-    header_lines = 3
     while(nextline.split(' ')[0] == 'comment'):
         header_lines += 1
         nextline = file.readline().strip()
@@ -29,19 +35,34 @@ def load_ply(filename, enableCaching=True):
     assert nextline.split(' ')[0] == 'element'
     assert nextline.split(' ')[1] == 'vertex'
     expected_vertices = int(nextline.split(' ')[2])
+    header_lines += 1
 
     columntypes = []
     columnnames = []
 
     while(1):
-        line = file.readline().strip().split(' ')
-        if line[0] == 'property':
-            columntypes.append(line[1])
-            columnnames.append(line[2])
+        nextline = file.readline().strip().split(' ')
+        if nextline[0] == 'property':
+            columntypes.append(nextline[1])
+            columnnames.append(nextline[2])
             header_lines += 1
-        if line[0] == 'end_header':
-            header_lines += 1
+            continue
+        else:
             break
+
+    # meshlab annoyingly exports files with zero faces, instead of just ommitting the element.
+    if nextline[0] == 'element' and nextline[1] == 'face':
+        assert nextline[2] == '0', "Nonzero number of faces in the ply file is not handled yet!"
+        header_lines += 1
+
+        nextline = file.readline().strip().split(' ')
+        assert nextline[0] == 'property'
+        header_lines += 1
+
+        nextline = file.readline().strip().split(' ')
+        
+    assert nextline[0] == 'end_header'
+    header_lines += 1
 
     file.close()
 
@@ -59,4 +80,3 @@ def load_ply(filename, enableCaching=True):
 
     assert data.shape[0]==expected_vertices
     return data, columnnames, columntypes
-
