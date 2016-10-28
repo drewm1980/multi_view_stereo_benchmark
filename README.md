@@ -40,11 +40,19 @@ sudo apt-get install python3 python3-numpy
 
 Warning! Dependencies are still in flux!
 
+## Building
+
+The benchmark is a mix of Python 3 and C++ wrapped in python. You must first build the C++ parts:
+
+1. cd multi_view_stereo_benchmark
+1. ccmake .
+1. (press c to configure, e if PCL stuff throws errors, g to generate Makefiles and exit)
+1. make
+
 ## Running
 
-1. Check out this git repo
 1. Download the dataset from the google drive and place it as a subdirectory "data" in the root directory of this git repository.
-1. STILL WRITING HERE
+1. ./compare_clouds.py should run without errors in under a second on a typical workstation.
 
 # FAQ
 
