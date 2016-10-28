@@ -20,7 +20,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr copy_c_array_to_point_cloud(const float* arr
 
 extern "C" {
 void compare_clouds(const float* cloud1_, const float* cloud2_, int points1,
-                    int points2) {
+                    int points2, float octreeResolution, float distanceThreshold) {
   cout << "In the C++ code..."<<endl;
     cout << points1 << endl;
     cout << points2 << endl;
@@ -30,7 +30,7 @@ void compare_clouds(const float* cloud1_, const float* cloud2_, int points1,
     auto cloud1 = copy_c_array_to_point_cloud(cloud1_, points1);
     auto cloud2 = copy_c_array_to_point_cloud(cloud2_, points2);
 
-    float octreeResolution = .005f; // m. Note: Tunable for performance
+    //float octreeResolution = .005f; // m. Note: Tunable for performance
     pcl::octree::OctreePointCloudSearch<pcl::PointXYZ> octree1 (octreeResolution);
     pcl::octree::OctreePointCloudSearch<pcl::PointXYZ> octree2 (octreeResolution);
     octree1.setInputCloud(cloud1);
@@ -38,7 +38,7 @@ void compare_clouds(const float* cloud1_, const float* cloud2_, int points1,
     octree1.addPointsFromInputCloud ();
     octree2.addPointsFromInputCloud ();
 
-    float distanceThreshold = .002f; // m Note: Affects the meaning of the benchmark!
+    //float distanceThreshold = .002f; // m Note: Affects the meaning of the benchmark!
     int numCloud1PointsNearCloud2 = 0;
     int numCloud2PointsNearCloud1 = 0;
     
