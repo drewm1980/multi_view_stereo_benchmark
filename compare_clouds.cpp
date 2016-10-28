@@ -18,10 +18,53 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr copy_c_array_to_point_cloud(const float* arr
     return cloud;
 }
 
+bool is_point_close_to_cloud_bruteforce(const float* point_, const float* cloud,
+                                        int points, float distanceThreshold) {
+  float point[3];
+  point[3] = 0.0f;
+  for(int i=0; i<3; i++) point[i] = point_[i];
+  point[0] = point_[0];
+  point[1] = point_[1];
+  for(int cloudIndex=0; cloudIndex<3*points; cloudIndex+=3)
+  {
+    float cloudpoint[3];
+    for(int i=0; i<3; i++) cloudpoint[i] = cloud[cloudIndex+i];
+    float distancePoint[3];
+    for(int i=0; i<3; i++) distancePoint[i] = cloudpoint[i]-point[i];
+    float squaredDistance = 0.0f;
+    for(int i=0; i<3; i++) squaredDistance += distancePoint[i]*distancePoint[i];
+    if(squaredDistance < distanceThreshold*distanceThreshold) return true;
+  }
+  return false;
+}
+
 extern "C" {
-void compare_clouds(const float* cloud1_, const float* cloud2_, int points1,
+void compare_clouds_bruteforce(const float* cloud1_, const float* cloud2_, int points1,
+                    int points2, float distanceThreshold) {
+  int numCloud1PointsNearCloud2 = 0;
+  int numCloud2PointsNearCloud1 = 0;
+
+  cout << "searching for cloud1 points in cloud2...." << endl;
+  for(int i=0; i<points1; i++)
+  {
+      if (is_point_close_to_cloud_bruteforce(cloud1_ + 3 * i, cloud2_, points2,
+                                             distanceThreshold)) {
+          numCloud1PointsNearCloud2++;
+      }
+  }
+  cout << numCloud1PointsNearCloud2 << endl;
+  cout << "searching for cloud2 points in cloud1...." << endl;
+  for(int i=0; i<points2; i++)
+  {
+      if (is_point_close_to_cloud_bruteforce(cloud2_ + 3 * i, cloud1_, points1,
+                                             distanceThreshold)) {
+          numCloud2PointsNearCloud1++;
+      }
+  }
+  cout << numCloud2PointsNearCloud1 << endl;
+}
+void compare_clouds_btree(const float* cloud1_, const float* cloud2_, int points1,
                     int points2, float octreeResolution, float distanceThreshold) {
-  cout << "In the C++ code..."<<endl;
     cout << points1 << endl;
     cout << points2 << endl;
 
@@ -33,6 +76,13 @@ void compare_clouds(const float* cloud1_, const float* cloud2_, int points1,
     //float octreeResolution = .005f; // m. Note: Tunable for performance
     pcl::octree::OctreePointCloudSearch<pcl::PointXYZ> octree1 (octreeResolution);
     pcl::octree::OctreePointCloudSearch<pcl::PointXYZ> octree2 (octreeResolution);
+
+    // Setting the bounding box doesn't seem to affect runtime substantially.
+    //double r = .05;
+    //auto set_bounding_box = [r](decltype(octree1) octree){octree.defineBoundingBox(-r,-r,-r,r,r,r);};
+    //set_bounding_box(octree1);
+    //set_bounding_box(octree2);
+
     octree1.setInputCloud(cloud1);
     octree2.setInputCloud(cloud2);
     octree1.addPointsFromInputCloud ();
