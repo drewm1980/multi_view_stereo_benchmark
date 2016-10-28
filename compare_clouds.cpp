@@ -45,6 +45,7 @@ void compare_clouds_bruteforce(const float* cloud1_, const float* cloud2_, int p
   int numCloud2PointsNearCloud1 = 0;
 
   cout << "searching for cloud1 points in cloud2...." << endl;
+#pragma omp parallel for reduction(+:numCloud1PointsNearCloud2)
   for(int i=0; i<points1; i++)
   {
       if (is_point_close_to_cloud_bruteforce(cloud1_ + 3 * i, cloud2_, points2,
@@ -54,6 +55,7 @@ void compare_clouds_bruteforce(const float* cloud1_, const float* cloud2_, int p
   }
   cout << numCloud1PointsNearCloud2 << endl;
   cout << "searching for cloud2 points in cloud1...." << endl;
+#pragma omp parallel for reduction(+:numCloud2PointsNearCloud1)
   for(int i=0; i<points2; i++)
   {
       if (is_point_close_to_cloud_bruteforce(cloud2_ + 3 * i, cloud1_, points1,

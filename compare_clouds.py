@@ -63,6 +63,7 @@ if __name__=='__main__':
     print('Running bruteforce point cloud comparison as a sanity check...')
     t1 = time()
     compare_clouds_bruteforce(cloud1PointData, cloud2PointData)
+    #compare_clouds_btree(cloud1PointData, cloud2PointData)
     t2 = time()
     print(' time: ', t2-t1, ' sec')
 
@@ -71,10 +72,10 @@ if __name__=='__main__':
     #for octreeResolution in (.005, .007, .01):
     #for octreeResolution in (.006, .007, .008):
     #for octreeResolution in (.0065, .007, .0075):
-    for octreeResolution in (.0075,):
-        #print('octreeResolution: ', octreeResolution, flush=True)
-        t1 = time()
-        compare_clouds_btree(cloud1PointData, cloud2PointData, octreeResolution=octreeResolution)
-        t2 = time()
-        print('octreeResolution: ', octreeResolution, end='')
-        print(' time: ', t2-t1, ' sec')
+    #for octreeResolution in (.0075,):
+        ##print('octreeResolution: ', octreeResolution, flush=True)
+        #t1 = time()
+        #compare_clouds_btree(cloud1PointData, cloud2PointData, octreeResolution=octreeResolution)
+        #t2 = time()
+        #print('octreeResolution: ', octreeResolution, end='')
+        #print(' time: ', t2-t1, ' sec')

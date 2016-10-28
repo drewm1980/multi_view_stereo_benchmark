@@ -20,7 +20,7 @@ find_package(PCL 1.8 REQUIRED COMPONENTS common io visualization sample_consensu
 add_library(compare_clouds SHARED compare_clouds.cpp)
 target_include_directories(compare_clouds PRIVATE ${PCL_INCLUDE_DIRS})
 target_link_libraries(compare_clouds ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES} ${PCL_SAMPLE_CONSENSUS_LIBRARIES})
-target_compile_options(compare_clouds PRIVATE -std=c++11 -O3 -Werror -Wall -ffast-math)
+target_compile_options(compare_clouds PRIVATE -std=c++11 -O3 -Werror -Wall -ffast-math -fopenmp)
 
 #add_executable(compare_clouds_bin compare_clouds.cpp)
 #set_target_properties(compare_clouds_bin PROPERTIES OUTPUT_NAME compare_clouds)
