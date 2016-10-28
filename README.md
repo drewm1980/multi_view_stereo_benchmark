@@ -1,5 +1,7 @@
 # The Robovision Multiple View Stereo (MVS) Benchmark
 
+# WARNING!!! This benchmark is still under active development! 
+
 # Introduction
 
 This directory contains code for benchmarking the performance of 3D reconstruction algorithms. Goals:
@@ -24,17 +26,25 @@ For context, this benchmark is similar to the Middlebury Multi-View Stereo Bench
 
 A note about rigor: this is NOT a research oriented benchmark. I am developing it in one day. Think of it as a tool for us to use in communication with vendors, that is at least better than looking at one point cloud and going "meh, looks good..."
 
-## Dependences
+## Dependencies
 I used the default pcl in ubuntu 14.04:
 sudo apt-get install libpcl-1.7-all-dev
 
+C++ development stuff
+sudo apt-get install build-essential
+sudo apt-get install cmake cmake-curses-gui
+sudo apt-get install git g++
+
 python stuff
 sudo apt-get install python3 python3-numpy
+
+Warning! Dependencies are still in flux!
 
 ## Running
 
 1. Check out this git repo
 1. Download the dataset from the google drive and place it as a subdirectory "data" in the root directory of this git repository.
+1. STILL WRITING HERE
 
 # FAQ
 

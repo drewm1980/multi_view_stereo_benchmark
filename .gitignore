@@ -8,3 +8,5 @@ undistorted
 data
 compare_clouds
 __pycache__/
+perf.data.*
+perf.data
