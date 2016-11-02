@@ -1,0 +1,3 @@
+[submodule "extern/CMVS-PMVS"]
+	path = extern/CMVS-PMVS
+	url = https://github.com/drewm1980/CMVS-PMVS
