@@ -1,11 +1,16 @@
+#include <string>
+#include <iostream>
+#include <vector>
+
+#ifdef USE_PCL
 #include <pcl/point_types.h>
 #include <pcl/io/ply_io.h>
 #include <pcl/octree/octree.h>
-
-#include <string>
-#include <vector>
+#endif
 
 using namespace std;
+
+#ifdef USE_PCL
 using Point = pcl::PointXYZ;
 
 // TODO maybe with another initializer this can compile into a memcpy...
@@ -17,7 +22,10 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr copy_c_array_to_point_cloud(const float* arr
     }
     return cloud;
 }
+#endif
 
+extern "C" {
+using namespace std;
 bool is_point_close_to_cloud_bruteforce(const float* point_, const float* cloud,
                                         int points, float distanceThreshold) {
   float point[3];
@@ -38,7 +46,6 @@ bool is_point_close_to_cloud_bruteforce(const float* point_, const float* cloud,
   return false;
 }
 
-extern "C" {
 void compare_clouds_bruteforce(const float* cloud1_, const float* cloud2_, int points1,
                     int points2, float distanceThreshold) {
   int numCloud1PointsNearCloud2 = 0;
@@ -65,6 +72,8 @@ void compare_clouds_bruteforce(const float* cloud1_, const float* cloud2_, int p
   }
   cout << numCloud2PointsNearCloud1 << endl;
 }
+
+#ifdef USE_PCL
 void compare_clouds_btree(const float* cloud1_, const float* cloud2_, int points1,
                     int points2, float octreeResolution, float distanceThreshold) {
     cout << points1 << endl;
@@ -119,6 +128,7 @@ void compare_clouds_btree(const float* cloud1_, const float* cloud2_, int points
     }
     cout << numCloud2PointsNearCloud1 << endl;
 }
+#endif
 }
 
 int main(int argc, char** argv) {
@@ -142,12 +152,14 @@ int main(int argc, char** argv) {
          << cloud1FileName << endl
          << cloud2FileName << endl;
 
+#ifdef USE_PCL
     auto cloud1 = pcl::PointCloud<Point>::Ptr(new pcl::PointCloud<Point>);
     auto cloud2 = pcl::PointCloud<Point>::Ptr(new pcl::PointCloud<Point>);
 
+    // PCL's point cloud parser pukes on files exported from meshlab
     pcl::io::loadPLYFile<Point>(cloud1FileName.c_str(), *cloud1);
     pcl::io::loadPLYFile<Point>(cloud2FileName.c_str(), *cloud2);
-
+    
     // if (cloud1->width < 20) {
     // throw std::runtime_error("Loaded point cloud contains almost no points!
     // Th");
@@ -156,4 +168,7 @@ int main(int argc, char** argv) {
     // throw std::runtime_error("Loaded point cloud contains almost no
     // points!");
     //}
+#endif
+    cout << "Not really doing anything in this main file! Run the python wrapper!" << endl;
+
 }
