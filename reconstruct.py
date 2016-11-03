@@ -331,8 +331,8 @@ def generate_missing_reconstructions(imagesPath: Path,
                      options=optionsDict[optionName],
                      destFile=destFileNames[optionName])
 
-def do_reconstructions_for_the_benchmark(sourceDir=Path('undistorted'),
-                                         destDir=Path('reconstructions')):
+def do_reconstructions_for_the_benchmark(sourceDir=Path('data/undistorted'),
+                                         destDir=Path('data/reconstructions')):
     assert sourceDir.is_dir()
     assert destDir.is_dir()
     for objectPath in sourceDir.iterdir():
