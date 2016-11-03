@@ -21,7 +21,13 @@ FloatPointer = ndpointer(dtype=numpy.float32, ndim=1, flags='ALIGNED', shape=(1,
 libcompare_clouds = numpy.ctypeslib.load_library('libcompare_clouds','.')
 Cloud = ndpointer(dtype=numpy.float32,ndim=2,flags='CONTIGUOUS,ALIGNED')
 '''This must MANUALLY be kept in sync with the PointCloudComparisonResult struct in compare_clouds.cpp! '''
-PointCloudComparisonResultFields = ['numCloud1PointsNearCloud2', 'numCloud2PointsNearCloud1']
+
+PointCloudComparisonResultFields = ['numCloud1Points', 
+                                    'numCloud2Points',
+                                    'distanceThreshold',
+                                    'numCloud1PointsNearCloud2',
+                                    'numCloud2PointsNearCloud1']
+
 PointCloudComparisonResultPointer = ndpointer(dtype=numpy.float32, ndim=1, flags='ALIGNED', shape=(len(PointCloudComparisonResultFields),))
 
 def add_metadata(array):

@@ -14,6 +14,9 @@ using namespace std;
 #pragma pack()
 struct PointCloudComparisonResult {
     // This must manually be kept synchronized with PointCloudComparisonFields!
+    float numCloud1Points;
+    float numCloud2Points;
+    float distanceThreshold;
     float numCloud1PointsNearCloud2;
     float numCloud2PointsNearCloud1;
 };
@@ -64,7 +67,7 @@ void compare_clouds_bruteforce(const float* cloud1_, const float* cloud2_,
     int numCloud1PointsNearCloud2 = 0;
     int numCloud2PointsNearCloud1 = 0;
 
-    cout << "searching for cloud1 points in cloud2...." << endl;
+    //cout << "searching for cloud1 points in cloud2...." << endl;
 #pragma omp parallel for reduction(+ : numCloud1PointsNearCloud2)
     for (int i = 0; i < points1; i++) {
         if (is_point_close_to_cloud_bruteforce(cloud1_ + 3 * i, cloud2_,
@@ -72,8 +75,8 @@ void compare_clouds_bruteforce(const float* cloud1_, const float* cloud2_,
             numCloud1PointsNearCloud2++;
         }
     }
-    cout << numCloud1PointsNearCloud2 << endl;
-    cout << "searching for cloud2 points in cloud1...." << endl;
+    //cout << numCloud1PointsNearCloud2 << endl;
+    //cout << "searching for cloud2 points in cloud1...." << endl;
 #pragma omp parallel for reduction(+ : numCloud2PointsNearCloud1)
     for (int i = 0; i < points2; i++) {
         if (is_point_close_to_cloud_bruteforce(cloud2_ + 3 * i, cloud1_,
@@ -81,10 +84,12 @@ void compare_clouds_bruteforce(const float* cloud1_, const float* cloud2_,
             numCloud2PointsNearCloud1++;
         }
     }
-    cout << numCloud2PointsNearCloud1 << endl;
-
-    result->numCloud2PointsNearCloud1 = numCloud2PointsNearCloud1;
+    //cout << numCloud2PointsNearCloud1 << endl;
+    result->numCloud1Points = points1;
+    result->numCloud2Points = points2;
+    result->distanceThreshold = distanceThreshold;
     result->numCloud1PointsNearCloud2 = numCloud1PointsNearCloud2;
+    result->numCloud2PointsNearCloud1 = numCloud2PointsNearCloud1;
 }
 
 #ifdef USE_PCL
@@ -92,11 +97,11 @@ void compare_clouds_btree(const float* cloud1_, const float* cloud2_,
                           int points1, int points2, float octreeResolution,
                           float distanceThreshold,
                           PointCloudComparisonResult* result) {
-    cout << points1 << endl;
-    cout << points2 << endl;
+    //cout << points1 << endl;
+    //cout << points2 << endl;
 
     // Compare two point clouds, stored compactly in xyzxyz... format
-    cout << "Copying point cloud data into PCL data structures..." << endl;
+    //cout << "Copying point cloud data into PCL data structures..." << endl;
     auto cloud1 = copy_c_array_to_point_cloud(cloud1_, points1);
     auto cloud2 = copy_c_array_to_point_cloud(cloud2_, points2);
 
@@ -138,17 +143,20 @@ void compare_clouds_btree(const float* cloud1_, const float* cloud2_,
 
     // Note: It's not really necessary to have both octrees allocated at the
     // same time
-    cout << "searching for cloud1 points in cloud2...." << endl;
+    //cout << "searching for cloud1 points in cloud2...." << endl;
     for (auto& searchPoint : cloud1->points) {
         if (pointNearCloud(searchPoint, octree2)) numCloud1PointsNearCloud2++;
     }
-    cout << numCloud1PointsNearCloud2 << endl;
-    cout << "searching for cloud2 points in cloud1...." << endl;
+    //cout << numCloud1PointsNearCloud2 << endl;
+    //cout << "searching for cloud2 points in cloud1...." << endl;
     for (auto& searchPoint : cloud2->points) {
         if (pointNearCloud(searchPoint, octree1)) numCloud2PointsNearCloud1++;
     }
-    cout << numCloud2PointsNearCloud1 << endl;
+    //cout << numCloud2PointsNearCloud1 << endl;
 
+    result->numCloud1Points = points1;
+    result->numCloud2Points = points2;
+    result->distanceThreshold = distanceThreshold;
     result->numCloud2PointsNearCloud1 = numCloud2PointsNearCloud1;
     result->numCloud1PointsNearCloud2 = numCloud1PointsNearCloud2;
 }
