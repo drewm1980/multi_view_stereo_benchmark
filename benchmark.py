@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 
-# Code for actually running the benchmark
+# Code for running the benchmark
 
 from pathlib import Path
-from compare_clouds import compare_clouds
-from load_ply import load_ply
 import numpy
 import pandas
 import datetime
 
-referenceKey = 'reference'
-
-keysToBenchmark = ('high_quality', 'medium_quality', 'low_quality')
+from compare_clouds import compare_clouds
+from load_ply import load_ply
+from reconstruct import optionNames
 
 def to_datetime(scanID):
     ''' Convert my string timestamps to numpy timestamps '''
@@ -24,7 +22,7 @@ def to_datetime(scanID):
 
 raw = pandas.DataFrame()
 
-for key in keysToBenchmark:
+for key in optionNames:
     print('Runing benchmark for algorithm key', key)
     for path in Path('./data/reconstructions').iterdir():
 
@@ -35,17 +33,24 @@ for key in keysToBenchmark:
         assert plyPath in plyFiles, "Expected file " + str(plyPath) + ' does not exist! Try running reconstruct.py to add missing reconstructions?'
         cloud = load_ply(plyPath)[0][:, :3].astype(numpy.float32)
 
-        referencePath = path / (referenceKey + '.ply')
+        scanID = path.name
+        referencePath = Path('data/reference_reconstructions')/ scanID / 'reference.ply'
         assert referencePath.is_file(), 'Reference cloud file ' + str(referencePath) + ' could not be found... you probably need to make one manually in meshlab based on a high quality reconstruction?'
         referenceCloud = load_ply(referencePath)[0][:, :3].astype(numpy.float32)
         stats = compare_clouds(referenceCloud, cloud)
         stats['algorithm']=key
-        scanID = path.name
         stats['scanID'] = scanID
-        stats['t'] = to_datetime(scanID)
-        stats = stats.set_index('t')
+        #stats['t'] = to_datetime(scanID)
+        #stats = stats.set_index('t')
+
+        runtimeFile = path / (key+'_runtime.txt')
+        with runtimeFile.open('r') as fd:
+            dt = float(fd.readline()) # seconds
+        stats['reconstructionTime'] = dt
+
         raw = raw.append(stats, ignore_index=False)
 
+print('Done with all of the point cloud comparisons!')
 #print(raw)
 
 #raw.groupby('algorithm').mean()
@@ -57,6 +62,7 @@ metrics['outlierRatio'] = (raw['numCloud2Points'] - raw['numCloud2PointsNearClou
 metrics['incompletenessRatio'] = (raw['numCloud1Points'] - raw['numCloud1PointsNearCloud2']) / raw['numCloud1Points']
 metrics['algorithm'] = raw['algorithm']
 metrics['scanID'] = raw['scanID']
+metrics['reconstructionTime'] = raw['reconstructionTime']
 metrics.set_index('scanID')
 metrics.to_csv('results/metrics.csv') # backup
 

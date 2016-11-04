@@ -250,7 +250,7 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     destFile -- The destination name of the ply file. (default <name of the directory>.ply)
     options -- An instance of PMVS2Options
     workDirectory -- Existing directory where pmvs will work. (default generates a temp directory)
-    runtimeFile -- The name of a file where info regarding the runtime will be stored. (default <name of the directory>.txt
+    runtimeFile -- The name of a file where info regarding the runtime will be stored.
     """
     import shutil
     import glob
@@ -298,7 +298,7 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     subprocess.check_output(args=['pmvs2', './', str(optionsFile)],
                             cwd=str(workDirectory))
     t2 = time()
-    dt = t2-t1 # seconds
+    dt = t2-t1 # seconds. TODO: scrape more accurate timing from PMVS shell output
 
     # Copy the file to the appropriate destination
     if destDir is None:
@@ -308,9 +308,9 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     destPath = destDir / destFile
 
     if runtimeFile is None:
-        runtimeFile = destDir / 'runtime.txt'
-    with open(runtimeFile, 'w') as fd:
-        fd.write(str(dt))
+        runtimeFile = destPath.parent / (destPath.stem +'_runtime.txt')
+    with open(str(runtimeFile), 'w') as fd:
+        fd.write(str(dt)) # seconds
 
     plyPath = modelsDir / Path(str(optionsFile) + '.ply')
     if plyPath.is_file():
@@ -322,12 +322,21 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
         assert False # Note, if this is hit, the tmp directory will already be removed!
 
 
-# Some hard-coded options
-optionNames = ['low', 'medium', 'high']
-optionsDict = {'low': PMVS2Options(numCameras=12, level=2, csize=4, numNeighbors=1),
-            'medium':PMVS2Options(numCameras=12, level=1, csize=4, numNeighbors=2),
-            'high':PMVS2Options(numCameras=12, level=0, csize=4, numNeighbors=2)}
-destFileNames = {optionName:optionName+'_quality.ply' for optionName in optionNames}
+# Some hard-coded options, roughly slow to fast
+optionsDict = {
+            'pmvs_2_2_1': PMVS2Options(numCameras=12, level=2, csize=2, numNeighbors=1),
+            'pmvs_2_4_1': PMVS2Options(numCameras=12, level=2, csize=4, numNeighbors=1),
+            'pmvs_2_8_1': PMVS2Options(numCameras=12, level=2, csize=8, numNeighbors=1),
+
+            'pmvs_2_2_2': PMVS2Options(numCameras=12, level=2, csize=2, numNeighbors=2),
+            'pmvs_2_4_2': PMVS2Options(numCameras=12, level=2, csize=4, numNeighbors=2),
+            'pmvs_2_8_2': PMVS2Options(numCameras=12, level=2, csize=8, numNeighbors=2),
+
+            'pmvs_1_4_2':PMVS2Options(numCameras=12, level=1, csize=4, numNeighbors=2),
+            'pmvs_0_4_2':PMVS2Options(numCameras=12, level=0, csize=4, numNeighbors=2) # Used for generating the references (followed by hand cleanup)
+            }
+optionNames = optionsDict.keys()
+destFileNames = {optionName:optionName+'.ply' for optionName in optionNames}
 
 def generate_missing_reconstructions(imagesPath: Path,
                                      reconstructionsPath: Path=Path('.'),
@@ -346,7 +355,8 @@ def generate_missing_reconstructions(imagesPath: Path,
 def do_reconstructions_for_the_benchmark(sourceDir=Path('data/undistorted_images'),
                                          destDir=Path('data/reconstructions')):
     assert sourceDir.is_dir()
-    assert destDir.is_dir()
+    if not destDir.is_dir():
+        destDir.mkdir()
     for objectPath in sourceDir.iterdir():
         objectid = objectPath.name
         print('Performing reconstructions for object ', objectid)
