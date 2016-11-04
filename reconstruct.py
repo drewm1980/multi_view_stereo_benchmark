@@ -6,6 +6,7 @@ import numpy
 
 def set_up_visualize_subdirectory(inputPath,destPath):
     """
+    Create the "visualize" subdirectory required by PMVS
     Inputs:
     inputPath -- full path to a directory containing undistorted images
     destPath -- full path to a directory where the "visualize" subdir will be 
@@ -238,7 +239,7 @@ def write_vis_file_ring(numCameras,numNeighbors=1,visFilePath=Path('vis.dat')):
                 fd.write(str(neighbor_camera) + ' ')
             fd.write('\n')
 
-def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None):
+def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None):
     """ Run PMVS2 on a directory full of images.
 
         The images must ALREADY be radially undistorted!
@@ -249,6 +250,7 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     destFile -- The destination name of the ply file. (default <name of the directory>.ply)
     options -- An instance of PMVS2Options
     workDirectory -- Existing directory where pmvs will work. (default generates a temp directory)
+    runtimeFile -- The name of a file where info regarding the runtime will be stored. (default <name of the directory>.txt
     """
     import shutil
     import glob
@@ -262,6 +264,7 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
                      destDir=destDir,
                      destFile=destFile,
                      options=options,
+                     runtimeFile=runtimeFile,
                      workDirectory=Path(workDirectory))
         return
 
@@ -290,8 +293,12 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     # Run PMVS2
     import subprocess
     print("Calling pmvs2...")
+    from time import time
+    t1 = time()
     subprocess.check_output(args=['pmvs2', './', str(optionsFile)],
                             cwd=str(workDirectory))
+    t2 = time()
+    dt = t2-t1 # seconds
 
     # Copy the file to the appropriate destination
     if destDir is None:
@@ -299,6 +306,11 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     if destFile is None:
         destFile = 'reconstruction.ply'
     destPath = destDir / destFile
+
+    if runtimeFile is None:
+        runtimeFile = destDir / 'runtime.txt'
+    with open(runtimeFile, 'w') as fd:
+        fd.write(str(dt))
 
     plyPath = modelsDir / Path(str(optionsFile) + '.ply')
     if plyPath.is_file():
@@ -331,7 +343,7 @@ def generate_missing_reconstructions(imagesPath: Path,
                      options=optionsDict[optionName],
                      destFile=destFileNames[optionName])
 
-def do_reconstructions_for_the_benchmark(sourceDir=Path('data/undistorted'),
+def do_reconstructions_for_the_benchmark(sourceDir=Path('data/undistorted_images'),
                                          destDir=Path('data/reconstructions')):
     assert sourceDir.is_dir()
     assert destDir.is_dir()
@@ -345,7 +357,6 @@ def do_reconstructions_for_the_benchmark(sourceDir=Path('data/undistorted'),
             destPath.mkdir()
         generate_missing_reconstructions(imagesPath=objectPath,reconstructionsPath=destPath)
         
-
 
 if __name__=='__main__':
     do_reconstructions_for_the_benchmark()
