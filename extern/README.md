@@ -18,3 +18,7 @@ the builds of all the dependencies into one CMake invocation.
 We will, however, be quite liberal in how we hack on the CMakeLists files of our
 dependencies to make them easier to configure and run from a really dumb shell
 script.
+
+## Building
+
+TODO: automate building all of the dependencies somehow...

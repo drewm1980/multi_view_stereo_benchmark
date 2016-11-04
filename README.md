@@ -1,8 +1,6 @@
 # The Robovision Multiple View Stereo (MVS) Benchmark
 
-# WARNING!!! This benchmark is still under active development! 
-
-# Introduction
+## Introduction
 
 This directory contains code for benchmarking the performance of 3D reconstruction algorithms. Goals:
 
@@ -43,26 +41,22 @@ Warning! Dependencies are still in flux!
 
 ## Building
 
-1. Clone this repo `git clone git@github.com:drewm1980/multi_view_stereo_benchmark.git`
+1. Clone this repo using `git clone git@github.com:drewm1980/multi_view_stereo_benchmark.git`.  This will pull down the code for the benchmark itself.  
+1. The source code for the benchmarked algorithms, as well as the source dataset for the benchmark, are stored in git submodules. To pull down all of that, run `git submodule init` in the root of the repository
 
-This will pull down the code for the benchmark itself. 
+1. The benchmark is a mix of Python 3 and C++ wrapped in python. You must first build the C++ parts:
+    `cd multi_view_stereo_benchmark`
+    `ccmake .`
+    (press `c` to configure, `e` if PCL stuff throws errors, `g` to generate Makefiles and exit)
+    `make`
 
-The source code for the benchmarked algorithms, as well as the source dataset for the benchmark, are stored in git submodules. To pull down all of that, run `git submodule init` in the root of the repository
-
-The benchmark is a mix of Python 3 and C++ wrapped in python. You must first build the C++ parts:
-
-1. `cd multi_view_stereo_benchmark`
-1. `ccmake .`
-1. (press c to configure, e if PCL stuff throws errors, g to generate Makefiles and exit)
-1. `make`
-
-1. Building the reconstruction algorithms using the instructions in extern/README.md
+1. Build the reconstruction algorithms using the instructions in extern/README.md
 
 ## Running
 1. Run `./reconstruct.py` to generate all of the point cloud reconstructions
 1. Run `./benchmark.py` to perform all of point cloud comparisons and output the benchmark results
 
-# FAQ
+## FAQ
 
 1. Why are the images upside down? Because my cameras are mounted upside down.
 1. Why is the directory structure the way it is? This benchmark evolved out of another internal benchmark and I'm trying to keep it mostly compatible.
