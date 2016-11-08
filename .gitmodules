@@ -3,7 +3,7 @@
 	url = https://github.com/drewm1980/CMVS-PMVS
 [submodule "data"]
 	path = data
-	url = git@github.com:drewm1980/multi_view_stereo_data.git
+	url = git@github.com:drewm1980/multi_view_stereo_benchmark_data.git
 [submodule "extern/gipuma"]
 	path = extern/gipuma
 	url = git@github.com:drewm1980/gipuma
