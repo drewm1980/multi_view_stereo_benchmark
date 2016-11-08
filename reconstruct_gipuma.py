@@ -3,11 +3,90 @@
 # Code for performing reconstruction using gipuma.
 
 from pathlib import Path
+from load_camera_info import load_intrinsics, load_extrinsics
+import numpy
 
 gipumaPath = Path('extern/gipuma/gipuma').resolve()
 
 # Gipuma can, in principle, use pmvs2 directories, so we will try to re-use some code...
 from reconstruct_pmvs2 import set_up_visualize_subdirectory, set_up_txt_subdirectory, write_vis_file_ring
+
+def set_up_middlebury_tree(inputPath, destPath):
+    """ Create a the input file and directory structure defined in the middlebury benchmark 
+    Inputs: 
+        inputPath -- full path to a directory containing undistorted images and HALCON camera calibration info.
+        destPath -- full path of the directory in which the data and files will be placed.
+    """
+    import glob
+    if not destPath.is_dir():
+        destPath.mkdir()
+    print('setting up middlebury tree in ', str(destPath), '...')
+    numCameras = len(list((inputPath.glob("*.png"))))
+
+    # Copy the images into destPath. To help keep things straight I will generate filenames
+    # using "widgetSR" instead of "dinoSR" for sparse ring.
+    pngFileNames = [] # Middleburry benchmark likes to stick names in files so we need to keep these.
+    import shutil
+    for i in range(numCameras):
+        sourceFilename = "image_camera%02i.png" % (i + 1)
+        destFilename = "widget%04i.png" % (i + 1)
+        shutil.copy(
+            str(inputPath / sourceFilename), str(destPath / destFilename))
+        pngFileNames.append(destFilename)
+
+    # Create the silhouette file
+    Path(destPath/'widgetSR_good_silhouette_images.txt').touch()
+
+    # Generate the par file
+    """
+    *_par.txt:  camera parameters.  There is one line for each image.  The format for each line is:
+        "imgname.png k11 k12 k13 k21 k22 k23 k31 k32 k33 r11 r12 r13 r21 r22 r23 r31 r32 r33 t1 t2 t3"
+        The projection matrix for that image is given by K*[R t]
+        The image origin is top-left, with x increasing horizontally, y vertically
+    *_ang.txt:  latitude, longitude angles for each image.  Not needed to compute scene->image mapping, but may be helpful for visualization.
+    """
+    parFileContents = ''
+    for i in range(numCameras):
+        # Load the intrinsics
+        intrinsicsFilePath = inputPath / ('intrinsics_camera%02i.txt' % (i + 1))
+        cameraMatrix, distCoffs = load_intrinsics(intrinsicsFilePath)
+        # The images must already be radially undistorted
+        assert(abs(distCoffs[0]) < .000000001)
+        assert(abs(distCoffs[1]) < .000000001)
+        assert(abs(distCoffs[2]) < .000000001)
+        assert(abs(distCoffs[3]) < .000000001)
+        assert(abs(distCoffs[4]) < .000000001)
+
+        # Load the extrinsics
+        extrinsicsFilePath = inputPath / ('extrinsics_camera%02i.txt' % (i + 1))
+        R, T = load_extrinsics(extrinsicsFilePath)
+        R,T = R.T,numpy.dot(-R.T,T) # Invert the transform
+
+        # Load the intrinsics
+        intrinsicsFilePath = inputPath / ('intrinsics_camera%02i.txt' % (i + 1))
+        cameraMatrix, distCoffs = load_intrinsics(intrinsicsFilePath)
+        K = cameraMatrix
+
+        # TODO: Maybe I need to swap the meaning of x and y for middlebury?
+
+        parFileContents += pngFileNames[i] + ' '
+        assert cameraMatrix.shape == (3, 3)
+        for i in range(3):
+            for j in range(3):
+                parFileContents += str(float(K[i,j]))
+                parFileContents += ' '
+        for i in range(3):
+            for j in range(3):
+                parFileContents += str(float(R[i,j]))
+                parFileContents += ' '
+        for i in range(3):
+            parFileContents += str(float(T[i]))
+            parFileContents += ' '
+        parFileContents = parFileContents[:-1]
+        parFileContents += '\n'
+
+    print('parFileContents: \n', parFileContents)
+    # TODO working here...
 
 class GIPUMAOptions():
     """ This class represents most of the user-supplied options to GIPUMA.
@@ -58,6 +137,39 @@ class GIPUMAOptions():
                     fd.write(key + ' ' + ' '.join(map(str, val)) + '\n')
                     continue
 
+
+def run_gipuma_using_middlebury_input(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None):
+    """ Run gipuma on a directory full of images with HALCON style camera parameters
+
+        The images must ALREADY be radially undistorted!
+
+    Arguments:
+    imagesPath -- A directory full of source images and HALCON style camera parameters
+    destDir -- The destination directory of the ply file. (default current directory)
+    destFile -- The destination name of the ply file. (default <name of the directory>.ply)
+    options -- An instance of GIPUMAOptions
+    workDirectory -- Existing directory where gipuma will work. (default generates a temp directory)
+    runtimeFile -- The name of a file where info regarding the runtime will be stored.
+    """
+    import shutil
+    import glob
+
+    # By default, work in a temporary directory.
+    # "with...as" ensures the temp directory is cleared even if there is an error below.
+    if workDirectory is None:
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as workDirectory:
+            run_gipuma_using_pmvs_input(imagesPath=imagesPath,
+                     destDir=destDir,
+                     destFile=destFile,
+                     options=options,
+                     runtimeFile=runtimeFile,
+                     workDirectory=Path(workDirectory))
+        return
+
+    imagesPath = imagesPath.resolve()
+    set_up_middlebury_tree(imagesPath,workDirectory)
+    # TODO still working here...
 
 
 def run_gipuma_using_pmvs_input(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None):
@@ -115,12 +227,18 @@ def run_gipuma_using_pmvs_input(imagesPath, destDir=None, destFile=None, options
     import subprocess
     print("Calling gipuma...")
     from time import time
-    args = [str(gipumaPath),'--pmvs_folder .', '--camera_idx=00000000', '--depth_min=.12', '--depth_max=0.2']
+    args = [str(gipumaPath), '--pmvs_folder', str(workDirectory.resolve()),
+            '--camera_idx=00000000', '--depth_min=.12', '--depth_max=0.2']
     print('Running command ', ' '.join(args))
     t1 = time()
-    subprocess.check_output(args=args, cwd=str(workDirectory))
+    result = subprocess.run(args=args, cwd=str(workDirectory), stdout=subprocess.PIPE)
     t2 = time()
-    dt = t2-t1 # seconds. TODO: scrape more accurate timing from PMVS shell output
+    dt = t2-t1 # seconds. TODO: scrape more accurate timing from shell output
+    print("gipuma output:")
+    print(result.stdout.decode('utf8'))
+
+    if result.returncode != 0:
+        print("WARNING! GIPUMA returned a non-zero return value!")
 
     # Copy the file to the appropriate destination
     if destDir is None:
@@ -155,5 +273,4 @@ if __name__=='__main__':
     imagesPath = Path('data/undistorted_images/2016_10_24__17_43_02')
     workDirectory=Path('working_directory_gipuma')
     #run_gipuma_using_pmvs_input(imagesPath, workDirectory=workDirectory)
-
-
+    run_gipuma_using_middlebury_input(imagesPath, workDirectory=workDirectory)
