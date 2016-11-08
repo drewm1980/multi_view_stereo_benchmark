@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 
+# Code for updating all of the reconstructions
+
 from pathlib import Path
 import numpy
 
-from reconstruct_pmvs2 import set_up_visualize_subdirectory, run_pmvs
+from reconstruct_pmvs2 import set_up_visualize_subdirectory, run_pmvs, pmvsOptionNames, pmvsOptionsDict
+
+optionNames = pmvsOptionNames
+destFileNames = {optionName:optionName+'.ply' for optionName in pmvsOptionNames}
 
 def generate_missing_reconstructions(imagesPath: Path,
                                      reconstructionsPath: Path=Path('.'),
                                      optionNames=optionNames,
-                                     optionsDict=optionsDict,
+                                     optionsDict=pmvsOptionsDict,
                                      destFileNames=destFileNames):
     for optionName in optionNames:
         destFileName = destFileNames[optionName]
@@ -18,6 +23,7 @@ def generate_missing_reconstructions(imagesPath: Path,
                      destDir=reconstructionsPath,
                      options=optionsDict[optionName],
                      destFile=destFileNames[optionName])
+            # TODO: Extend this to run gipuma and others too...
 
 def do_reconstructions_for_the_benchmark(sourceDir=Path('data/undistorted_images'),
                                          destDir=Path('data/reconstructions')):

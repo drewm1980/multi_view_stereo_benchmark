@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
-import numpy
-
 # Code for performing reconstruction using pmvs2
+
+import numpy
 from pathlib import Path
+
+pmvs2Path = Path('extern/CMVS-PMVS/program/main/pmvs2').resolve()
+assert pmvs2Path.is_file(), "pmvs2 binary not found. Try running bootstrap.sh?"
 
 from load_camera_info import load_intrinsics, load_extrinsics
 
@@ -212,10 +215,11 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
 
     # Run PMVS2
     import subprocess
-    print("Calling pmvs2...")
     from time import time
+    args = [str(pmvs2Path), '.', str(optionsFile)]
+    print('Running command ', ' '.join(args))
     t1 = time()
-    subprocess.check_output(args=['pmvs2', './', str(optionsFile)],
+    subprocess.check_output(args=args,
                             cwd=str(workDirectory))
     t2 = time()
     dt = t2-t1 # seconds. TODO: scrape more accurate timing from PMVS shell output
@@ -243,7 +247,7 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
 
 
 # Some hard-coded options, roughly slow to fast
-optionsDict = {
+pmvsOptionsDict = {
             'pmvs_2_2_1': PMVS2Options(numCameras=12, level=2, csize=2, numNeighbors=1),
             'pmvs_2_4_1': PMVS2Options(numCameras=12, level=2, csize=4, numNeighbors=1),
             'pmvs_2_8_1': PMVS2Options(numCameras=12, level=2, csize=8, numNeighbors=1),
@@ -255,6 +259,5 @@ optionsDict = {
             'pmvs_1_4_2':PMVS2Options(numCameras=12, level=1, csize=4, numNeighbors=2),
             'pmvs_0_4_2':PMVS2Options(numCameras=12, level=0, csize=4, numNeighbors=2) # Used for generating the references (followed by hand cleanup)
             }
-optionNames = optionsDict.keys()
-destFileNames = {optionName:optionName+'.ply' for optionName in optionNames}
+pmvsOptionNames = pmvsOptionsDict.keys()
 

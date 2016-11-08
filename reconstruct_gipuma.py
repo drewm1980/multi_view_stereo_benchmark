@@ -115,9 +115,9 @@ def run_gipuma_using_pmvs_input(imagesPath, destDir=None, destFile=None, options
     import subprocess
     print("Calling gipuma...")
     from time import time
-    t1 = time()
     args = [str(gipumaPath),'--pmvs_folder .', '--camera_idx=00000000', '--depth_min=.12', '--depth_max=0.2']
     print('Running command ', ' '.join(args))
+    t1 = time()
     subprocess.check_output(args=args, cwd=str(workDirectory))
     t2 = time()
     dt = t2-t1 # seconds. TODO: scrape more accurate timing from PMVS shell output
