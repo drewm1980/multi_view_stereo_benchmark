@@ -50,7 +50,7 @@ Warning! Dependencies are still in flux!
     (press `c` to configure, `e` if PCL stuff throws errors, `g` to generate Makefiles and exit)
     `make`
 
-1. Build the reconstruction algorithms using the instructions in extern/README.md
+1. Build the reconstruction algorithms by running bootstrap.sh. See extern/README.md for details.
 
 ## Running
 1. Run `./reconstruct.py` to generate all of the point cloud reconstructions
