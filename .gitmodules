@@ -1,6 +1,6 @@
 [submodule "extern/CMVS-PMVS"]
 	path = extern/CMVS-PMVS
-	url = https://github.com/drewm1980/CMVS-PMVS
+	url = git@github.com:drewm1980/CMVS-PMVS.git
 [submodule "data"]
 	path = data
 	url = git@github.com:drewm1980/multi_view_stereo_benchmark_data.git

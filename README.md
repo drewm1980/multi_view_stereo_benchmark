@@ -27,22 +27,21 @@ A note about rigor: this is NOT a research oriented benchmark. I am developing i
 ## Dependencies
 
 C++ development stuff
-    sudo apt-get install build-essential
-    sudo apt-get install cmake cmake-curses-gui
-    sudo apt-get install git g++
+    `sudo apt-get install build-essential`
+    `sudo apt-get install cmake cmake-curses-gui`
+    `sudo apt-get install git g++`
 
 python stuff
-    sudo apt-get install python3 python3-numpy python3-pandas
+    `sudo apt-get install python3 python3-numpy python3-pandas`
 
-I used the default pcl in ubuntu 14.04:
-    sudo apt-get install libpcl-1.7-all-dev
-
-Warning! Dependencies are still in flux!
+Optional:
+For one of my point cloud comparison implementations, I used the default pcl in ubuntu 14.04:
+    `sudo apt-get install libpcl-1.7-all-dev`
+At the time of writing you can ignore that.
 
 ## Building
 
-1. Clone this repo using `git clone git@github.com:drewm1980/multi_view_stereo_benchmark.git`.  This will pull down the code for the benchmark itself.  
-1. The source code for the benchmarked algorithms, as well as the source dataset for the benchmark, are stored in git submodules. To pull down all of that, run `git submodule init` in the root of the repository
+1. Clone everything repo using `git clone --recursive git@github.com:drewm1980/multi_view_stereo_benchmark.git`.  This will pull down the code for the benchmark itself, the dataset, and all of the dependencies.  
 
 1. The benchmark is a mix of Python 3 and C++ wrapped in python. You must first build the C++ parts:
     `cd multi_view_stereo_benchmark`
