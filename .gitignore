@@ -9,3 +9,5 @@ compare_clouds
 __pycache__/
 perf.data.*
 perf.data
+reconstruction_runtime.txt
+working_directory_gipuma

@@ -4,3 +4,9 @@
 [submodule "data"]
 	path = data
 	url = git@github.com:drewm1980/multi_view_stereo_data.git
+[submodule "extern/gipuma"]
+	path = extern/gipuma
+	url = git@github.com:drewm1980/gipuma
+[submodule "extern/fusibile"]
+	path = extern/fusibile
+	url = git@github.com:drewm1980/fusibile
