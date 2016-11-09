@@ -47,7 +47,8 @@ def load_intrinsics(filePath):
         Input:
             filePath -- The name of the file to read
         Output:
-            The camera projection matrix and distortion coefficients
+            The 3x3 camera projection matrix K and distortion coefficients.
+            x_pixel_homogeneous = K*x_world
         """
     d = load_halcon_intrinsics(filePath)
     cameraMatrix = numpy.zeros([3, 3])
@@ -80,6 +81,11 @@ def load_extrinsics(filePath):
         filePath -- The path of the text file containing the homogeous matrix
         Output:
         The Rotation matrix and Translation vector associated with the camera.
+        The matrices are for the transformation from the camera frame to
+        world coordinate frame, i.e. x_world = R*x_camera + T
+        T is in whatever units the camera calibration was done in (usually meters).
+        If you need the transformation in the other direction you can do:
+        R,T = R.T,numpy.dot(-R.T,T) # Invert the transform
         """
     strings = filePath.open().readlines()[0].strip().split(' ')
     assert len(strings)==12

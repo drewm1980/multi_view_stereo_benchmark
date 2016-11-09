@@ -10,6 +10,7 @@ assert pmvs2Path.is_file(), "pmvs2 binary not found. Try running bootstrap.sh?"
 
 from load_camera_info import load_intrinsics, load_extrinsics
 
+
 def set_up_visualize_subdirectory(inputPath,destPath):
     """
     Create the "visualize" subdirectory required by PMVS
@@ -162,6 +163,30 @@ def write_vis_file_ring(numCameras,numNeighbors=1,visFilePath=Path('vis.dat')):
                 fd.write(str(neighbor_camera) + ' ')
             fd.write('\n')
 
+
+def set_up_pmvs_tree(inputPath, destPath, options=None):
+    set_up_visualize_subdirectory(imagesPath,workDirectory)
+    set_up_txt_subdirectory(imagesPath,workDirectory)
+
+    # Generate the empty directory where pmvs puts its ply files
+    modelsDir = workDirectory / 'models'
+    if not modelsDir.is_dir():
+        modelsDir.mkdir()
+
+    numCameras = len(list(imagesPath.glob('*.png')))
+
+    # Generate PMVS options file
+    if options is None:
+        options = PMVS2Options(numCameras=numCameras)
+    options.write_options_file(optionsDir=workDirectory,
+                               optionsFile='option.txt')
+
+    # Generate PMVS vis.dat file
+    write_vis_file_ring(numCameras=numCameras,
+                        numNeighbors=options.numNeighbors,
+                        visFilePath=workDirectory / 'vis.dat')
+
+
 def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None):
     """ Run PMVS2 on a directory full of images.
 
@@ -190,39 +215,27 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
                      runtimeFile=runtimeFile,
                      workDirectory=Path(workDirectory))
         return
+    if not workDirectory.is_dir():
+        workDirectory.mkdir()
 
     imagesPath = imagesPath.resolve()
-    set_up_visualize_subdirectory(imagesPath,workDirectory)
-    set_up_txt_subdirectory(imagesPath,workDirectory)
 
-    modelsDir = workDirectory / 'models'
-    if not modelsDir.is_dir():
-        modelsDir.mkdir()
-    optionsFile='option.txt'
-
-    numCameras = len(list(imagesPath.glob('*.png')))
-
-    # Generate PMVS options file
-    if options is None:
-        options = PMVS2Options(numCameras=numCameras)
-    options.write_options_file(optionsDir=workDirectory,
-                               optionsFile=optionsFile)
-
-    # Generate PMVS vis.dat file
-    write_vis_file_ring(numCameras=numCameras,
-                        numNeighbors=options.numNeighbors,
-                        visFilePath=workDirectory / 'vis.dat')
+    set_up_pmvs_tree(imagesPath, workDirectory, options=options)
 
     # Run PMVS2
     import subprocess
     from time import time
-    args = [str(pmvs2Path), '.', str(optionsFile)]
+    args = [str(pmvs2Path), './', str('option.txt')] # Careful! That damn slash after the dot is CRITICAL
     print('Running command ', ' '.join(args))
     t1 = time()
-    subprocess.check_output(args=args,
-                            cwd=str(workDirectory))
+    result = subprocess.run(args=args,
+                            cwd=str(workDirectory), stdout=subprocess.PIPE)
     t2 = time()
     dt = t2-t1 # seconds. TODO: scrape more accurate timing from PMVS shell output
+    print("pmvs2 output:")
+    print(result.stdout.decode('utf8'))
+    if result.returncode != 0:
+        print("WARNING! pmvs2 returned a non-zero return value!")
 
     # Copy the file to the appropriate destination
     if destDir is None:
@@ -236,14 +249,15 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     with open(str(runtimeFile), 'w') as fd:
         fd.write(str(dt)) # seconds
 
-    plyPath = modelsDir / Path(str(optionsFile) + '.ply')
+    modelsDir = workDirectory / 'models'
+    plyPath = modelsDir / Path('option.txt' + '.ply')
     if plyPath.is_file():
         plyPath.rename(destPath)
     else:
         print(".ply file wasn't generated!")
         print('modelsDir: ' + str(modelsDir))
         print('plyPath: ' + str(plyPath))
-        assert False # Note, if this is hit, the tmp directory will already be removed!
+        assert False 
 
 
 # Some hard-coded options, roughly slow to fast
@@ -260,4 +274,12 @@ pmvsOptionsDict = {
             'pmvs_0_4_2':PMVS2Options(numCameras=12, level=0, csize=4, numNeighbors=2) # Used for generating the references (followed by hand cleanup)
             }
 pmvsOptionNames = pmvsOptionsDict.keys()
+
+if __name__=='__main__':
+    print('Attempting to run a reconstruction using pmvs')
+    imagesPath = Path('data/undistorted_images/2016_10_24__17_43_02')
+    workDirectory=Path('working_directory_pmvs')
+    options = pmvsOptionsDict['pmvs_2_2_1']
+    run_pmvs(imagesPath, workDirectory=workDirectory, options=options)
+    
 
