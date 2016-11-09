@@ -165,26 +165,28 @@ def write_vis_file_ring(numCameras,numNeighbors=1,visFilePath=Path('vis.dat')):
 
 
 def set_up_pmvs_tree(inputPath, destPath, options=None):
-    set_up_visualize_subdirectory(imagesPath,workDirectory)
-    set_up_txt_subdirectory(imagesPath,workDirectory)
+    """ Set up a PMVS style file tree in destPath.
+    inputPath contains images and HALCON camera parameter files."""
+    set_up_visualize_subdirectory(inputPath,destPath)
+    set_up_txt_subdirectory(inputPath,destPath)
 
     # Generate the empty directory where pmvs puts its ply files
-    modelsDir = workDirectory / 'models'
+    modelsDir = destPath / 'models'
     if not modelsDir.is_dir():
         modelsDir.mkdir()
 
-    numCameras = len(list(imagesPath.glob('*.png')))
+    numCameras = len(list(inputPath.glob('*.png')))
 
     # Generate PMVS options file
     if options is None:
         options = PMVS2Options(numCameras=numCameras)
-    options.write_options_file(optionsDir=workDirectory,
+    options.write_options_file(optionsDir=destPath,
                                optionsFile='option.txt')
 
     # Generate PMVS vis.dat file
     write_vis_file_ring(numCameras=numCameras,
                         numNeighbors=options.numNeighbors,
-                        visFilePath=workDirectory / 'vis.dat')
+                        visFilePath=destPath / 'vis.dat')
 
 
 def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None):
