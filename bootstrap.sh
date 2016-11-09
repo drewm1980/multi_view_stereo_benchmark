@@ -9,7 +9,7 @@ USE_PMVS2=1
 USE_GIPUMA=0
 
 # Generates the pmvs2 binary in extern/CMVS-PMVS/program/pmvs2
-if [ $USE_PMVS ]
+if [ $USE_PMVS2 ]
 then
 	(
 	cd extern/CMVS-PMVS/program
