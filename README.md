@@ -20,7 +20,7 @@ For context, this benchmark is similar to the Middlebury Multi-View Stereo Bench
 
 1. We have higher resolution images
 1. Middlebury includes benchmarks with many views; our setup is most similar to "dino sparse ring" case
-1. Middlebury used a laser scanner and a spherical gantry to generate high quality ground truth data. Our ground truth will just be pmvs2 run with very high quality settings.
+1. Middlebury used a laser scanner and a spherical gantry to generate high quality ground truth data. Our ground truth will just be pmvs2 run with very high quality settings, with outliers removed manually.
 1. On the upside, our imgages are all captured simultaneously, so there is no illumination variation between shots, as there is with a spherical gantry
 1. We do not have a fancy online interface for viewing results or submissions, etc... 
 
