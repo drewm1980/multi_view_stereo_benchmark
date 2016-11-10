@@ -28,6 +28,8 @@ A note about rigor: this is NOT a research oriented benchmark. I am developing i
 
 ## Dependencies
 
+These instructions are for Ubuntu 14.04
+
 C++ development stuff
     `sudo apt-get install build-essential`
     `sudo apt-get install cmake cmake-curses-gui`
@@ -63,3 +65,14 @@ At the time of writing you can ignore that.
 1. Why is the directory structure the way it is? This benchmark evolved out of another internal benchmark and I'm trying to keep it mostly compatible.
 1. Why are the images so dark/underexposed? Exposure is locked down on my rig, and we also image some more reflective objects that are not in the benchmark. In general, saturation in overexposed images is worse than low SNR in underexposed images, so I err on the side of dark. Also these are machine vision cameras, not DSLR/smartphones; the data has not gone through any fancy image filters to make them look good.
 
+## Current Status
+
+Algorithms in the benchmark:
+
+1. PMVS2, fully working
+1. gipuma, compiles and runs, full pipeline not working yet
+
+Input formats in the benchmark:
+
+1. PMVS2 format, complete
+1. middlebury format, coded but not tested at all yet

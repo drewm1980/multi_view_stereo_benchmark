@@ -230,13 +230,18 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     args = [str(pmvs2Path), './', str('option.txt')] # Careful! That damn slash after the dot is CRITICAL
     print('Running command ', ' '.join(args))
     t1 = time()
-    result = subprocess.run(args=args,
-                            cwd=str(workDirectory), stdout=subprocess.PIPE)
+    #result = subprocess.run(args=args, cwd=str(workDirectory), stdout=subprocess.PIPE) # Python 3.5
+    #stdout = result.stdout
+    #returncode = result.returncode
+    proc = subprocess.Popen(args=args, cwd=str(workDirectory), stdout=subprocess.PIPE) # Python 3.4
+    stdout, stderr = proc.communicate()
+    returncode = proc.returncode
+
     t2 = time()
     dt = t2-t1 # seconds. TODO: scrape more accurate timing from PMVS shell output
     print("pmvs2 output:")
-    print(result.stdout.decode('utf8'))
-    if result.returncode != 0:
+    print(stdout.decode('utf8'))
+    if returncode != 0:
         print("WARNING! pmvs2 returned a non-zero return value!")
 
     # Copy the file to the appropriate destination

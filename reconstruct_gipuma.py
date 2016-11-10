@@ -212,7 +212,12 @@ def run_gipuma(imagesPath, destDir=None, destFile=None, options=None, workDirect
         else:
             args = [str(gipumaPath)] + flags
         print('Running command ', ' '.join(args), ' in directiory ', str(workDirectory) )
-        result = subprocess.run(args=args, cwd=str(workDirectory), stdout=subprocess.PIPE)
+        #result = subprocess.run(args=args, cwd=str(workDirectory), stdout=subprocess.PIPE) # Python 3.5
+        #stdout = result.stdout
+        #returncode = result.returncode
+        proc = subprocess.Popen(args=args, cwd=str(workDirectory), stdout=subprocess.PIPE) # Python 3.4
+        stdout, stderr = proc.communicate()
+        returncode = proc.returncode
 
     # Run fusibile to merge the depth maps.
 
