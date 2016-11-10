@@ -7,6 +7,7 @@ This directory contains code for benchmarking the performance of 3D reconstructi
 1. Make it easier to compare open source and commercial MVS reconstruction algorithms
 1. Enable tuning of the speed vs. completeness vs. accuracy tradeoff
 1. Focus on setups most relevant to Robovision's industrial applications, i.e. run on Robovision's data
+1. Improve reproduceability by actually integrating public reconstruction codes in the benchmark
 
 More details:
 
@@ -16,6 +17,7 @@ More details:
 1. Any parameters you tune by hand must be held constant between reconstructions. Any parameters you tune automatically must be held constant, otherwise their compuation must be included in the reconstruction time.
 
 For context, this benchmark is similar to the Middlebury Multi-View Stereo Benchmark: http://vision.middlebury.edu/mview/. Some differences:
+
 1. We have higher resolution images
 1. Middlebury includes benchmarks with many views; our setup is most similar to "dino sparse ring" case
 1. Middlebury used a laser scanner and a spherical gantry to generate high quality ground truth data. Our ground truth will just be pmvs2 run with very high quality settings.
@@ -59,3 +61,5 @@ At the time of writing you can ignore that.
 
 1. Why are the images upside down? Because my cameras are mounted upside down.
 1. Why is the directory structure the way it is? This benchmark evolved out of another internal benchmark and I'm trying to keep it mostly compatible.
+1. Why are the images so dark/underexposed? Exposure is locked down on my rig, and we also image some more reflective objects that are not in the benchmark. In general, saturation in overexposed images is worse than low SNR in underexposed images, so I err on the side of dark. Also these are machine vision cameras, not DSLR/smartphones; the data has not gone through any fancy image filters to make them look good.
+
