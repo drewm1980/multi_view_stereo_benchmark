@@ -209,7 +209,7 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     # "with...as" ensures the temp directory is cleared even if there is an error below.
     if workDirectory is None:
         from tempfile import TemporaryDirectory
-        with TemporaryDirectory() as workDirectory:
+        with TemporaryDirectory(dir='tmp') as workDirectory:
             run_pmvs(imagesPath=imagesPath,
                      destDir=destDir,
                      destFile=destFile,
@@ -287,6 +287,7 @@ if __name__=='__main__':
     imagesPath = Path('data/undistorted_images/2016_10_24__17_43_02')
     workDirectory=Path('working_directory_pmvs')
     options = pmvsOptionsDict['pmvs_2_2_1']
-    run_pmvs(imagesPath, workDirectory=workDirectory, options=options)
+    #run_pmvs(imagesPath, workDirectory=workDirectory, options=options)
+    run_pmvs(imagesPath, options=options) # to test temp directory
     
 
