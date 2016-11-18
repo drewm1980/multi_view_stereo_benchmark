@@ -10,3 +10,6 @@
 [submodule "extern/fusibile"]
 	path = extern/fusibile
 	url = git@github.com:drewm1980/fusibile
+[submodule "black_box_optimization"]
+	path = black_box_optimization
+	url = git@github.com:drewm1980/black_box_optimization.git
