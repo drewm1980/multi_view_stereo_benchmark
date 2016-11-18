@@ -76,3 +76,10 @@ Input formats in the benchmark:
 
 1. PMVS2 format, complete
 1. middlebury format, coded but not tested at all yet
+
+## Licensing
+
+The code for the benchmark itself is developed commercially by Robovision Integrated Solutons NV, and shared under the MIT license. See LICENSE.txt for the standard details. We shared it online to simplify some of our collaborations with partners. If you use it and like it, tell everyone how awesome we are. If you use it and hate it, tell nobody!
+
+Each algorithm we include in the benchmark has its own license. At the time of writing, their licenses don't matter much because we run them as executables, not by linking (or calling) their API's.
+
