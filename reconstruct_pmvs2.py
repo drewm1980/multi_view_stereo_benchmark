@@ -3,6 +3,7 @@
 # Code for performing reconstruction using pmvs2
 
 import numpy
+import pathlib
 from pathlib import Path
 
 pmvs2Path = Path('extern/CMVS-PMVS/program/main/pmvs2').resolve()

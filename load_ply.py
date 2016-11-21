@@ -2,8 +2,10 @@
 
 # Simple .ply file loader to avoid adding an unnecessary dependency.
 
-import numpy
+import pathlib
 from pathlib import Path
+
+import numpy
 
 def load_ply(filename, enableCaching=True):
     """ Load an ascii based .ply file.

@@ -2,6 +2,7 @@
 
 # Code for updating all of the reconstructions
 
+import pathlib
 from pathlib import Path
 import numpy
 

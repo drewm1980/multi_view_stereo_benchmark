@@ -36,7 +36,7 @@ C++ development stuff
     `sudo apt-get install git g++`
 
 python stuff
-    `sudo apt-get install python3 python3-numpy python3-pandas`
+    `sudo apt-get install python3 python3-numpy python3-pandas python3-scipy python3-networkx`
 
 Optional:
 For one of my point cloud comparison implementations, I used the default pcl in ubuntu 14.04:

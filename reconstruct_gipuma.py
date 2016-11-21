@@ -2,6 +2,7 @@
 
 # Code for performing reconstruction using gipuma.
 import subprocess
+import pathlib
 from pathlib import Path
 from load_camera_info import load_intrinsics, load_extrinsics
 import numpy
