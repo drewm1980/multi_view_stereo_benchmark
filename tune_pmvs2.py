@@ -4,12 +4,17 @@
 #!/usr/bin/env python3
 
 import numpy
-import networkx
 import functools
+import pathlib
+from pathlib import Path
+
+import networkx
 
 from black_box_optimization import sequence, cartesian_product, greedy_neighbor_descent, exhaustive_search, graph_node_to_dict
 
-from reconstruct_pmvs2 import PMVS2Options
+from reconstruct_pmvs2 import PMVS2Options, run_pmvs
+
+from benchmark import compare_clouds_and_load_runtime, stats_to_objective
 
 # Define our search space
 grid=cartesian_product((sequence([12],'numCameras'),
@@ -26,22 +31,42 @@ grid=cartesian_product((sequence([12],'numCameras'),
         sequence([1,2,3],'numNeighbors')
         ))
 
+
 # Set up our objective function
 @functools.lru_cache(maxsize=None)
 def f(parametersTuple):
     assert type(parametersTuple) is tuple
-    d = graph_node_to_dict(parametersTuple)
+    d = graph_node_to_dict(graph=grid, node=parametersTuple)
     options = PMVS2Options(**d)
 
-    # TODO
-    # Do the reconstruction...
+    widget = '2016_10_24__17_43_02'
+    imagesPath = Path('data/undistorted_images') / widget
+    workDirectory = Path('working_directory_pmvs')
+    plyPath = Path('tuning_reconstruction.ply')
+    runtimeFile = Path('tuning_runtime.txt')
 
-    # Run part of the benchmark...
+    if runtimeFile.is_file():
+        runtimeFile.unlink()
+    if plyPath.is_file():
+        plyPath.unlink()
+    print('Performing the reconstruction...')
+    run_pmvs(imagesPath,
+             options=options,
+             workDirectory=workDirectory,
+             destFile=plyPath,
+             runtimeFile=runtimeFile)
+
+    print('Computing the objective')
+    referencePath = Path('data') / 'reference_reconstructions' / widget / 'reference.ply'
+    stats = compare_clouds_and_load_runtime(plyPath=plyPath,
+                                            referencePath=referencePath,
+                                            runtimeFile=runtimeFile)
 
     # Compute a scalar performance metric...
-    pass
-    
+    objective = stats_to_objective(stats)
+    return objective
+
+
 seed = (12,1,2,0.7,7,2,4,1,-1,None,0,2) # TODO write converter from the class to dict.
 
 stopPoint = greedy_neighbor_descent(grid, f, seed)
-

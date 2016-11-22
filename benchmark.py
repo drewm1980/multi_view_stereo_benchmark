@@ -24,7 +24,22 @@ def to_datetime(scanID):
 typicalCloudSize = 32423 # Average number of points per reference cloud
 typicalReconstructionTime = 0.5 # seconds.
 
-def stat_to_objective(stats):
+
+def compare_clouds_and_load_runtime(plyPath, referencePath, runtimeFile):
+    ''' Compute cloud similarity statistics given the Paths of two ply files
+        and the path of a .txt file containing the runtime.'''
+    cloud = load_ply(plyPath)[0][:, :3].astype(numpy.float32)
+    referenceCloud = load_ply(referencePath)[0][:, :3].astype(numpy.float32)
+    stats = compare_clouds(referenceCloud, cloud)
+    stats['algorithm']=key
+    stats['scanID'] = scanID
+    with runtimeFile.open('r') as fd:
+        dt = float(fd.readline()) # seconds
+    stats['reconstructionTime'] = dt
+    return stats
+
+
+def stats_to_objective(stats):
     ''' This is where the master performance metric for the benchmark.
         This is intended to be used by parameter tuning code,
         and for sorting the final results of the benchmark. 
@@ -39,19 +54,6 @@ def stat_to_objective(stats):
     reconstructionTime = stats['reconstructionTime'] / typicalReconstructionTime
     meshQuality = (storageSize + outlierRatio + incompletenessRatio) / 3
     return (meshQuality + reconstructionTime) / 2
-
-def compare_clouds_and_load_runtime(plyPath, referencePath, runtimeFile):
-    ''' Compute cloud similarity statistics given the Paths of two ply files
-        and the path of a .txt file containing the runtime.'''
-    cloud = load_ply(plyPath)[0][:, :3].astype(numpy.float32)
-    referenceCloud = load_ply(referencePath)[0][:, :3].astype(numpy.float32)
-    stats = compare_clouds(referenceCloud, cloud)
-    stats['algorithm']=key
-    stats['scanID'] = scanID
-    with runtimeFile.open('r') as fd:
-        dt = float(fd.readline()) # seconds
-    stats['reconstructionTime'] = dt
-    return stats
 
 
 if __name__=='__main__':
