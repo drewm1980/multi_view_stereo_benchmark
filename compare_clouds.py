@@ -15,8 +15,6 @@ from ctypes import c_int32 as int32
 import numpy
 from numpy.ctypeslib import ndpointer
 
-import pandas
-
 FloatPointer = ndpointer(dtype=numpy.float32, ndim=1, flags='ALIGNED', shape=(1,))
 
 libcompare_clouds = numpy.ctypeslib.load_library('libcompare_clouds','.')
@@ -33,8 +31,10 @@ PointCloudComparisonResultPointer = ndpointer(dtype=numpy.float32, ndim=1, flags
 
 def add_metadata(array):
     ''' Adds metatadata to the results of our point cloud comparison.'''
-    a = pandas.DataFrame(data=array).T
-    a.columns = PointCloudComparisonResultFields
+    #import pandas
+    #a = pandas.DataFrame(data=array).T
+    #a.columns = PointCloudComparisonResultFields
+    a = dict(zip(PointCloudComparisonResultFields, array))
     return a
 
 # Wrap the PCL cloud comparison implementation if it was compiled into the .so file.

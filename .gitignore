@@ -13,3 +13,4 @@ reconstruction_runtime.txt
 working_directory_gipuma
 reconstruction.ply
 working_directory_pmvs
+data_*

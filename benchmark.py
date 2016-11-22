@@ -5,8 +5,8 @@
 import pathlib
 from pathlib import Path
 import numpy
-import pandas
 import datetime
+import pandas
 
 from compare_clouds import compare_clouds
 from load_ply import load_ply
@@ -21,56 +21,100 @@ def to_datetime(scanID):
     ts_numpy = numpy.datetime64(ts)
     return ts_numpy
 
-raw = pandas.DataFrame()
+typicalCloudSize = 32423 # Average number of points per reference cloud
+typicalReconstructionTime = 0.5 # seconds.
 
-for key in optionNames:
-    print('Runing benchmark for algorithm key', key)
-    for path in Path('./data/reconstructions').iterdir():
+def stat_to_objective(stats):
+    ''' This is where the master performance metric for the benchmark.
+        This is intended to be used by parameter tuning code,
+        and for sorting the final results of the benchmark. 
+        lower is better.'''
+    storageSize = stats['numCloud2Points'] / typicalCloudSize
+    outlierRatio = (
+        stats['numCloud2Points'] -
+        stats['numCloud2PointsNearCloud1']) / stats['numCloud2Points']
+    incompletenessRatio = (
+        stats['numCloud1Points'] -
+        stats['numCloud1PointsNearCloud2']) / stats['numCloud1Points']
+    reconstructionTime = stats['reconstructionTime'] / typicalReconstructionTime
+    meshQuality = (storageSize + outlierRatio + incompletenessRatio) / 3
+    return (meshQuality + reconstructionTime) / 2
 
-        assert path.is_dir(), "Unsure what to do with files in the reconstructions directory! There should only be folders here!"
-        plyFiles = path.glob("*.ply")
-        plyPath = path / (key + '.ply')
+def compare_clouds_and_load_runtime(plyPath, referencePath, runtimeFile):
+    ''' Compute cloud similarity statistics given the Paths of two ply files
+        and the path of a .txt file containing the runtime.'''
+    cloud = load_ply(plyPath)[0][:, :3].astype(numpy.float32)
+    referenceCloud = load_ply(referencePath)[0][:, :3].astype(numpy.float32)
+    stats = compare_clouds(referenceCloud, cloud)
+    stats['algorithm']=key
+    stats['scanID'] = scanID
+    with runtimeFile.open('r') as fd:
+        dt = float(fd.readline()) # seconds
+    stats['reconstructionTime'] = dt
+    return stats
 
-        assert plyPath in plyFiles, "Expected file " + str(plyPath) + ' does not exist! Try running reconstruct.py to add missing reconstructions?'
-        cloud = load_ply(plyPath)[0][:, :3].astype(numpy.float32)
 
-        scanID = path.name
-        referencePath = Path('data/reference_reconstructions')/ scanID / 'reference.ply'
-        assert referencePath.is_file(), 'Reference cloud file ' + str(referencePath) + ' could not be found... you probably need to make one manually in meshlab based on a high quality reconstruction?'
-        referenceCloud = load_ply(referencePath)[0][:, :3].astype(numpy.float32)
-        stats = compare_clouds(referenceCloud, cloud)
-        stats['algorithm']=key
-        stats['scanID'] = scanID
-        #stats['t'] = to_datetime(scanID)
-        #stats = stats.set_index('t')
+if __name__=='__main__':
 
-        runtimeFile = path / (key+'_runtime.txt')
-        with runtimeFile.open('r') as fd:
-            dt = float(fd.readline()) # seconds
-        stats['reconstructionTime'] = dt
+    # Do all of our cloud comparisons, aggregating the data in a list of dicts
+    rawStats = []
+    for key in optionNames:
+        print('Runing benchmark for algorithm key', key)
+        for path in Path('./data/reconstructions').iterdir():
 
-        raw = raw.append(stats, ignore_index=False)
+            assert path.is_dir(), "Unsure what to do with files in the reconstructions directory! There should only be folders here!"
+            plyFiles = path.glob("*.ply")
+            plyPath = path / (key + '.ply')
 
-print('Done with all of the point cloud comparisons!')
-#print(raw)
+            assert plyPath in plyFiles, "Expected file " + str(plyPath) + ' does not exist! Try running reconstruct.py to add missing reconstructions?'
 
-#raw.groupby('algorithm').mean()
+            scanID = path.name
+            referencePath = Path('data/reference_reconstructions')/ scanID / 'reference.ply'
+            assert referencePath.is_file(), 'Reference cloud file ' + str(referencePath) + ' could not be found... you probably need to make one manually in meshlab based on a high quality reconstruction?'
 
-# Extract more meaningful metrics from the raw comparison data. Smaller is better. 
-metrics = pandas.DataFrame()
-metrics['storageSize'] = raw['numCloud2Points'] / raw['numCloud1Points'].mean()
-metrics['outlierRatio'] = (raw['numCloud2Points'] - raw['numCloud2PointsNearCloud1']) / raw['numCloud2Points']
-metrics['incompletenessRatio'] = (raw['numCloud1Points'] - raw['numCloud1PointsNearCloud2']) / raw['numCloud1Points']
-metrics['algorithm'] = raw['algorithm']
-metrics['scanID'] = raw['scanID']
-metrics['reconstructionTime'] = raw['reconstructionTime']
-metrics.set_index('scanID')
-metrics.to_csv('results/metrics.csv') # backup
+            runtimeFile = path / (key+'_runtime.txt')
 
-# Ask some interesting questions about the data
+            stats = compare_clouds_and_load_runtime(
+                plyPath=plyPath, referencePath=referencePath, runtimeFile=runtimeFile)
 
-# How did the algorithms do against each other on average?
-byAlgorithm = metrics.groupby('algorithm').mean().sort_values('incompletenessRatio')
-print(byAlgorithm)
-with open('results/byAlgorithm.txt','w') as fd:
-    fd.write(byAlgorithm.to_string()+'\n')
+            rawStats.append(stats)
+
+    print('Done with all of the point cloud comparisons!')
+
+    # Transpose to list of numpy arrays
+    keys = list(rawStats[0].keys())
+    ndarrays = []
+    for key in keys:
+        ndarray = numpy.array([stat[key] for stat in rawStats])
+        ndarrays.append(ndarray)
+
+    # Convert to pandas
+    raw = pandas.DataFrame()
+    columnsPandas = []
+    for i in range(len(keys)):
+        column = pandas.DataFrame(ndarrays[i],columns=[keys[i]])
+        columnsPandas.append(column)
+    raw = pandas.concat(columnsPandas, axis=1)
+
+    #raw.groupby('algorithm').mean()
+
+    # Extract more meaningful metrics from the raw comparison data. Smaller is better. 
+    metrics = pandas.DataFrame()
+
+    metrics['storageSize'] = raw['numCloud2Points'] / typicalCloudSize
+    metrics['outlierRatio'] = (raw['numCloud2Points'] - raw['numCloud2PointsNearCloud1']) / raw['numCloud2Points']
+    metrics['incompletenessRatio'] = (raw['numCloud1Points'] - raw['numCloud1PointsNearCloud2']) / raw['numCloud1Points']
+
+    metrics['reconstructionTime'] = raw['reconstructionTime']
+    metrics['algorithm'] = raw['algorithm']
+    metrics['scanID'] = raw['scanID']
+    metrics.set_index('scanID')
+    metrics.to_csv('results/metrics.csv') # backup
+
+    # Ask some interesting questions about the data
+
+    # How did the algorithms do against each other on average?
+    byAlgorithm = metrics.groupby('algorithm').mean().sort_values('incompletenessRatio')
+    print(byAlgorithm)
+    with open('results/byAlgorithm.txt','w') as fd:
+        fd.write(byAlgorithm.to_string()+'\n')
