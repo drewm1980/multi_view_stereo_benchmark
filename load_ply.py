@@ -80,5 +80,6 @@ def load_ply(filename, enableCaching=True):
             #print("Pickle non-existent or older than .ply file; regenerating it!")
             numpy.save(arr=data,file=str(plyCachedPath))
 
-    assert data.shape[0]==expected_vertices
+    assert data.shape[0]==expected_vertices, 'Ply file corrupted! Inconsistent number of vertices!'
+    assert data.shape[0] > 0, 'Ply file did not contain any points!'
     return data, columnnames, columntypes

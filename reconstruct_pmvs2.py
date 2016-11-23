@@ -117,10 +117,15 @@ class PMVS2Options():
         self.sequence = sequence
         self.numNeighbors = numNeighbors
         if timages is None:
-            self.timages = [-1, 0, numCameras]
+            self.timages = (-1, 0, numCameras)
         else:
             self.timages = timages
         self.oimages = oimages
+
+    def __hash__(self):
+        fields = list(self.__dict__.items())
+        fields.sort()
+        return hash(tuple(fields)) # 
 
     def write_options_file(self,
                            optionsDir=Path('.'),
@@ -133,7 +138,7 @@ class PMVS2Options():
                 if type(val) in (int,float):
                     fd.write('%s %s\n'%(key,str(val)))
                     continue
-                if type(val) is list:
+                if type(val) in (list,tuple):
                     fd.write(key + ' ' + ' '.join(map(str, val)) + '\n')
                     continue
 
@@ -265,22 +270,49 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
         print(".ply file wasn't generated!")
         print('modelsDir: ' + str(modelsDir))
         print('plyPath: ' + str(plyPath))
-        assert False 
+        assert False
 
 
 # Some hard-coded options, roughly slow to fast
 pmvsOptionsDict = {
-            'pmvs_2_2_1': PMVS2Options(numCameras=12, level=2, csize=2, numNeighbors=1),
-            'pmvs_2_4_1': PMVS2Options(numCameras=12, level=2, csize=4, numNeighbors=1),
-            'pmvs_2_8_1': PMVS2Options(numCameras=12, level=2, csize=8, numNeighbors=1),
-
-            'pmvs_2_2_2': PMVS2Options(numCameras=12, level=2, csize=2, numNeighbors=2),
-            'pmvs_2_4_2': PMVS2Options(numCameras=12, level=2, csize=4, numNeighbors=2),
-            'pmvs_2_8_2': PMVS2Options(numCameras=12, level=2, csize=8, numNeighbors=2),
-
-            'pmvs_1_4_2':PMVS2Options(numCameras=12, level=1, csize=4, numNeighbors=2),
-            'pmvs_0_4_2':PMVS2Options(numCameras=12, level=0, csize=4, numNeighbors=2) # Used for generating the references (followed by hand cleanup)
-            }
+    'pmvs_tuned1': PMVS2Options(minImageNum=3,
+                                CPU=7,
+                                useVisData=1,
+                                numNeighbors=2,
+                                oimages=0,
+                                sequence=-1,
+                                wsize=8,
+                                numCameras=12,
+                                timages=None,
+                                level=3,
+                                threshold=0.7,
+                                csize=6),
+    'pmvs_2_2_1':
+    PMVS2Options(numCameras=12, level=2,
+                 csize=2, numNeighbors=1),
+    'pmvs_2_4_1':
+    PMVS2Options(numCameras=12, level=2,
+                 csize=4, numNeighbors=1),
+    'pmvs_2_8_1':
+    PMVS2Options(numCameras=12, level=2,
+                 csize=8, numNeighbors=1),
+    'pmvs_2_2_2':
+    PMVS2Options(numCameras=12, level=2,
+                 csize=2, numNeighbors=2),
+    'pmvs_2_4_2':
+    PMVS2Options(numCameras=12, level=2,
+                 csize=4, numNeighbors=2),
+    'pmvs_2_8_2':
+    PMVS2Options(numCameras=12, level=2,
+                 csize=8, numNeighbors=2),
+    'pmvs_1_4_2':
+    PMVS2Options(numCameras=12, level=1,
+                 csize=4, numNeighbors=2),
+    'pmvs_0_4_2': PMVS2Options(
+        numCameras=12, level=0, csize=4,
+        numNeighbors=2
+    )  # Used for generating the references (followed by hand cleanup)
+}
 pmvsOptionNames = pmvsOptionsDict.keys()
 
 if __name__=='__main__':
@@ -290,5 +322,3 @@ if __name__=='__main__':
     options = pmvsOptionsDict['pmvs_2_2_1']
     #run_pmvs(imagesPath, workDirectory=workDirectory, options=options)
     run_pmvs(imagesPath, options=options) # to test temp directory
-    
-

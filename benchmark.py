@@ -31,8 +31,6 @@ def compare_clouds_and_load_runtime(plyPath, referencePath, runtimeFile):
     cloud = load_ply(plyPath)[0][:, :3].astype(numpy.float32)
     referenceCloud = load_ply(referencePath)[0][:, :3].astype(numpy.float32)
     stats = compare_clouds(referenceCloud, cloud)
-    stats['algorithm']=key
-    stats['scanID'] = scanID
     with runtimeFile.open('r') as fd:
         dt = float(fd.readline()) # seconds
     stats['reconstructionTime'] = dt
@@ -78,6 +76,8 @@ if __name__=='__main__':
 
             stats = compare_clouds_and_load_runtime(
                 plyPath=plyPath, referencePath=referencePath, runtimeFile=runtimeFile)
+            stats['algorithm']=key
+            stats['scanID'] = scanID
 
             rawStats.append(stats)
 
