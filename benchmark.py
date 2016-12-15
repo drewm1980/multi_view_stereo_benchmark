@@ -21,8 +21,9 @@ def to_datetime(scanID):
     ts_numpy = numpy.datetime64(ts)
     return ts_numpy
 
+# Note: These affect the optimization objective defined below!
 typicalCloudSize = 32423 # Average number of points per reference cloud
-typicalReconstructionTime = 0.5 # seconds.
+typicalReconstructionTime = 1.0 # seconds.
 
 
 def compare_clouds_and_load_runtime(plyPath, referencePath, runtimeFile):
@@ -41,7 +42,7 @@ def stats_to_objective(stats):
     ''' This is where the master performance metric for the benchmark.
         This is intended to be used by parameter tuning code,
         and for sorting the final results of the benchmark. 
-        lower is better.'''
+        lower objective is better.'''
     storageSize = stats['numCloud2Points'] / typicalCloudSize
     outlierRatio = (
         stats['numCloud2Points'] -

@@ -287,27 +287,39 @@ pmvsOptionsDict = {
                                 level=3,
                                 threshold=0.7,
                                 csize=6),
-    'pmvs_2_2_1':
-    PMVS2Options(numCameras=12, level=2,
-                 csize=2, numNeighbors=1),
-    'pmvs_2_4_1':
-    PMVS2Options(numCameras=12, level=2,
-                 csize=4, numNeighbors=1),
-    'pmvs_2_8_1':
-    PMVS2Options(numCameras=12, level=2,
-                 csize=8, numNeighbors=1),
-    'pmvs_2_2_2':
-    PMVS2Options(numCameras=12, level=2,
-                 csize=2, numNeighbors=2),
-    'pmvs_2_4_2':
-    PMVS2Options(numCameras=12, level=2,
-                 csize=4, numNeighbors=2),
-    'pmvs_2_8_2':
-    PMVS2Options(numCameras=12, level=2,
-                 csize=8, numNeighbors=2),
-    'pmvs_1_4_2':
-    PMVS2Options(numCameras=12, level=1,
-                 csize=4, numNeighbors=2),
+    'pmvs_tuned2': PMVS2Options(numCameras=12,
+                                level=3,
+                                csize=5,
+                                threshold=0.6,
+                                wsize=6,
+                                minImageNum=3,
+                                CPU=7,
+                                useVisData=1,
+                                sequence=-1,
+                                timages=None,
+                                oimages=0,
+                                numNeighbors=2),
+    'pmvs_2_2_1': PMVS2Options(
+        numCameras=12, level=2, csize=2,
+        numNeighbors=1),
+    'pmvs_2_4_1': PMVS2Options(
+        numCameras=12, level=2, csize=4,
+        numNeighbors=1),
+    'pmvs_2_8_1': PMVS2Options(
+        numCameras=12, level=2, csize=8,
+        numNeighbors=1),
+    'pmvs_2_2_2': PMVS2Options(
+        numCameras=12, level=2, csize=2,
+        numNeighbors=2),
+    'pmvs_2_4_2': PMVS2Options(
+        numCameras=12, level=2, csize=4,
+        numNeighbors=2),
+    'pmvs_2_8_2': PMVS2Options(
+        numCameras=12, level=2, csize=8,
+        numNeighbors=2),
+    'pmvs_1_4_2': PMVS2Options(
+        numCameras=12, level=1, csize=4,
+        numNeighbors=2),
     'pmvs_0_4_2': PMVS2Options(
         numCameras=12, level=0, csize=4,
         numNeighbors=2
