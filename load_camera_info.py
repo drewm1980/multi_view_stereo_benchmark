@@ -15,7 +15,12 @@ def load_halcon_intrinsics(filePath):
             A dictionary containing the focal length,
             radial distortion polynomial coefficients, etc...
             """
-    lines = filePath.open().readlines()
+    assert filePath.is_file()
+    try:
+        lines = filePath.open().readlines()
+    except:
+        print("File "+str(filePath)+" doesn't seem to be a readable text file! Try using HALCON 12 instead of 13 to generated the intrinsics!")
+        raise
     lines = map(lambda line: line.strip(), lines)
     lines = filter(lambda line: line != '', lines)
     lines = filter(lambda line: line[0] != '#', lines)

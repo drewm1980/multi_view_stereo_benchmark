@@ -6,10 +6,13 @@ import numpy
 import pathlib
 from pathlib import Path
 
-pmvs2Path = Path('extern/CMVS-PMVS/program/main/pmvs2').resolve()
+import os
+import inspect
+pwd = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
+pmvs2Path = Path(pwd) / 'extern/CMVS-PMVS/program/main/pmvs2'
 assert pmvs2Path.is_file(), "pmvs2 binary not found. Try running bootstrap.sh?"
 
-from load_camera_info import load_intrinsics, load_extrinsics
+from .load_camera_info import load_intrinsics, load_extrinsics
 
 
 def set_up_visualize_subdirectory(inputPath,destPath):
@@ -62,6 +65,7 @@ def set_up_txt_subdirectory(inputPath,destPath):
     for i in range(numCameras):
         # Load the intrinsics
         intrinsicsFilePath = inputPath / ('intrinsics_camera%02i.txt' % (i + 1))
+        assert intrinsicsFilePath.is_file(), "Couldn't find camera intrinsics in "+str(intrinsicsFilePath)
         cameraMatrix, distCoffs = load_intrinsics(intrinsicsFilePath)
         # The images must already be radially undistorted
         assert(abs(distCoffs[0]) < .000000001)
@@ -215,7 +219,7 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     # "with...as" ensures the temp directory is cleared even if there is an error below.
     if workDirectory is None:
         from tempfile import TemporaryDirectory
-        with TemporaryDirectory(dir='tmp') as workDirectory:
+        with TemporaryDirectory(dir=str(Path(pwd)/'tmp')) as workDirectory:
             run_pmvs(imagesPath=imagesPath,
                      destDir=destDir,
                      destFile=destFile,
@@ -298,32 +302,34 @@ pmvsOptionsDict = {
                                 sequence=-1,
                                 timages=None,
                                 oimages=0,
-                                numNeighbors=2),
-    'pmvs_2_2_1': PMVS2Options(
-        numCameras=12, level=2, csize=2,
-        numNeighbors=1),
-    'pmvs_2_4_1': PMVS2Options(
-        numCameras=12, level=2, csize=4,
-        numNeighbors=1),
-    'pmvs_2_8_1': PMVS2Options(
-        numCameras=12, level=2, csize=8,
-        numNeighbors=1),
-    'pmvs_2_2_2': PMVS2Options(
-        numCameras=12, level=2, csize=2,
-        numNeighbors=2),
-    'pmvs_2_4_2': PMVS2Options(
-        numCameras=12, level=2, csize=4,
-        numNeighbors=2),
-    'pmvs_2_8_2': PMVS2Options(
-        numCameras=12, level=2, csize=8,
-        numNeighbors=2),
-    'pmvs_1_4_2': PMVS2Options(
-        numCameras=12, level=1, csize=4,
-        numNeighbors=2),
-    'pmvs_0_4_2': PMVS2Options(
-        numCameras=12, level=0, csize=4,
-        numNeighbors=2
-    )  # Used for generating the references (followed by hand cleanup)
+                                numNeighbors=2)
+    #,
+    #'pmvs_2_2_1': PMVS2Options(
+        #numCameras=12, level=2, csize=2,
+        #numNeighbors=1),
+    #'pmvs_2_4_1': PMVS2Options(
+        #numCameras=12, level=2, csize=4,
+        #numNeighbors=1),
+    #'pmvs_2_8_1': PMVS2Options(
+        #numCameras=12, level=2, csize=8,
+        #numNeighbors=1),
+    #'pmvs_2_2_2': PMVS2Options(
+        #numCameras=12, level=2, csize=2,
+        #numNeighbors=2),
+    #'pmvs_2_4_2': PMVS2Options(
+        #numCameras=12, level=2, csize=4,
+        #numNeighbors=2),
+    #'pmvs_2_8_2': PMVS2Options(
+        #numCameras=12, level=2, csize=8,
+        #numNeighbors=2),
+    #'pmvs_1_4_2': PMVS2Options(
+        #numCameras=12, level=1, csize=4,
+        #numNeighbors=2)
+    #,
+    #'pmvs_0_4_2': PMVS2Options(
+        #numCameras=12, level=0, csize=4,
+        #numNeighbors=2
+    #)  # Used for generating the references (followed by hand cleanup)
 }
 pmvsOptionNames = pmvsOptionsDict.keys()
 

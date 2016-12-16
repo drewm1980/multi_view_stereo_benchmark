@@ -6,7 +6,7 @@ import pathlib
 from pathlib import Path
 import numpy
 
-from reconstruct_pmvs2 import set_up_visualize_subdirectory, run_pmvs, pmvsOptionNames, pmvsOptionsDict
+from .reconstruct_pmvs2 import set_up_visualize_subdirectory, run_pmvs, pmvsOptionNames, pmvsOptionsDict
 
 optionNames = pmvsOptionNames
 destFileNames = {optionName:optionName+'.ply' for optionName in pmvsOptionNames}
