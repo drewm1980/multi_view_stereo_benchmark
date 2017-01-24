@@ -4,7 +4,7 @@ import pathlib
 from pathlib import Path
 import numpy
 
-def load_halcon_intrinsics(filePath):
+def _load_halcon_intrinsics(filePath):
     """ Load a halcon camera intrinsics file.
             i.e. the human-readable ASCII ones starting with \"ParGroup\"
         This function just does a 1:1 mapping of the (badly documented)
@@ -56,7 +56,7 @@ def load_intrinsics(filePath):
             The 3x3 camera projection matrix K and distortion coefficients.
             x_pixel_homogeneous = K*x_world
         """
-    d = load_halcon_intrinsics(filePath)
+    d = _load_halcon_intrinsics(filePath)
     cameraMatrix = numpy.zeros([3, 3])
 
     fx = d['Focus'] / d['Sx']
