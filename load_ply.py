@@ -7,6 +7,30 @@ from pathlib import Path
 
 import numpy
 
+def load_ply_using_library(filename):
+    """ Load a plyfile using the plyfile library.
+        Doing it this way softens the dependency on the external library. """
+    from plyfile import PlyData, PlyElement
+    plydata = PlyData.read(filename)
+
+    data = plydata['vertex'].data
+    properties = plydata.elements[0].properties
+    columnnames = [p.name for p in properties]
+
+    # The library represents data in a list of tuples.
+    # I use a flat numpy array. plyfile uses structured arrays
+    columns = len(data.dtype)
+    rows = len(data)
+    outdata = numpy.zeros((rows,columns),dtype=numpy.float32)
+    i = 0
+    for columnname in columnnames:
+        outdata[:,i] = data[columnname]
+        i += 1
+
+    columntypes = [str(data.dtype[i]) for i in range(len(data.dtype))] # numpy typestrings
+    return outdata, columnnames, columntypes
+
+
 def load_ply(filename, enableCaching=True):
     """ Load an ascii based .ply file.
         Inputs:
@@ -23,10 +47,18 @@ def load_ply(filename, enableCaching=True):
 
     header_lines = 0
 
-    assert file.readline().strip() == 'ply'
+    try:
+        assert file.readline().strip() == 'ply'
+    except:
+        print("Trouble running readline on the file! Will try loading the file using the plyfile library!")
+        return load_ply_using_library(filename)
     header_lines += 1
 
-    assert file.readline().strip() == 'format ascii 1.0'
+    nextline = file.readline().strip()
+    if 'ascii' not in nextline:
+        assert 'binary' in nextline, 'Cannot even detect if ply file is ascii or binary!'
+        return load_ply_using_library(filename)
+    assert nextline == 'format ascii 1.0'
     header_lines += 1
 
     nextline = file.readline().strip()
