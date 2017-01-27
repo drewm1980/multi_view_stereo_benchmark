@@ -4,7 +4,10 @@ import pathlib
 from pathlib import Path
 import numpy
 
-def _load_halcon_intrinsics(filePath):
+_HalconDistortionParameters1 = ['Poly1', 'Poly2', 'Poly3', 'Poly4', 'Poly5']
+_HalconDistortionParameters2 = ['Kappa']
+
+def load_halcon_intrinsics(filePath):
     """ Load a halcon camera intrinsics file.
             i.e. the human-readable ASCII ones starting with \"ParGroup\"
         This function just does a 1:1 mapping of the (badly documented)
@@ -30,19 +33,20 @@ def _load_halcon_intrinsics(filePath):
     # remove ParGroup header
     assert (lines[0].startswith('ParGroup'))
     currentLine = 2
-    expectedNames = ['Focus', 'Poly1', 'Poly2', 'Poly3', 'Poly4', 'Poly5',
-                     'Sx', 'Sy', 'Cx', 'Cy', 'ImageWidth', 'ImageHeight']
-    expectedNameIndex = 0
+    otherNames = ['Focus', 'Sx', 'Sy', 'Cx', 'Cy', 'ImageWidth', 'ImageHeight']
+    expectedNames = _HalconDistortionParameters1 + _HalconDistortionParameters2 + otherNames
     d = {}
-    while currentLine < len(lines) and expectedNameIndex < len(expectedNames):
+    while currentLine < len(lines):
         line = lines[currentLine]
-        expectedName = expectedNames[expectedNameIndex]
-        assert (line.startswith(expectedName))
+        key = line.split(':')[0]
+        assert key in expectedNames, 'Unhandled key found in intrinsics file!'
         value_string = line.split(':')[2].split(';')[0]
-        value = float(value_string)
+        if key in ('ImageWidth','ImageHeight'):
+            value = int(value_string)
+        else:
+            value = float(value_string)
         currentLine += 3
-        expectedNameIndex += 1
-        d[expectedName] = value
+        d[key] = value
     return d
 
 
@@ -56,7 +60,7 @@ def load_intrinsics(filePath):
             The 3x3 camera projection matrix K and distortion coefficients.
             x_pixel_homogeneous = K*x_world
         """
-    d = _load_halcon_intrinsics(filePath)
+    d = load_halcon_intrinsics(filePath)
     cameraMatrix = numpy.zeros([3, 3])
 
     fx = d['Focus'] / d['Sx']
@@ -70,14 +74,19 @@ def load_intrinsics(filePath):
     cameraMatrix[1, 2] = cy
     cameraMatrix[2, 2] = 1.0
 
-    k1 = d['Poly1']
-    k2 = d['Poly2']
-    k3 = d['Poly3']
-    p1 = d['Poly4'] * .001
-    p2 = d['Poly5'] * .001
-    distCoffs = (k1, k2, p1, p2, k3)
+    if 'Poly5' in d:
+        k1 = d['Poly1']
+        k2 = d['Poly2']
+        k3 = d['Poly3']
+        p1 = d['Poly4'] * .001
+        p2 = d['Poly5'] * .001
+        distCoeffs = (k1, k2, p1, p2, k3)
+    elseif 'Kappa' in d:
+        distCoeffs = (d['Kappa'],)
+    else:
+        distCoeffs = (,)
 
-    return cameraMatrix, distCoffs
+    return cameraMatrix, distCoeffs
 
 def load_extrinsics(filePath):
     """ HALCON is able to export camera extrinsics as a homogeneous matrix
