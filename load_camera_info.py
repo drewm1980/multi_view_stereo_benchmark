@@ -185,7 +185,7 @@ def load_extrinsics(filePath):
         raise
     for line in lines:
         if 'Rotation angles [deg] or Rodriguez vector:' in line:
-            print('Rodriquez type HALCON extrinsics file detected!')
+            #print('Rodriquez type HALCON extrinsics file detected!')
             return load_halcon_extrinsics_rodriguez(filePath)
-    print('Homogeneous type HALCON extrinsics file detected!')
+    #print('Homogeneous type HALCON extrinsics file detected!')
     return load_halcon_extrinsics_homogeneous(filePath)

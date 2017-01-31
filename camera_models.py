@@ -101,7 +101,7 @@ def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
     kappa - the division model radial distortion parameter as defined by halcon.  """
     f_meters = f * 0.001
     x_projected = x * f_meters / z
-    y_projected = x * f_meters / z
+    y_projected = y * f_meters / z
     # z_projected = f_meters
 
     # Apply radial distortion in the image plane
@@ -113,8 +113,10 @@ def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
         u_tilde, v_tilde = u, v
 
     # Convert to pixel (sub) coordinates
-    u_pixel = u_tilde / (sensor_w * .001) + cx
-    v_pixel = v_tilde / (sensor_h * .001) + cy
+    u_pixel = u_tilde / (pixel_w * .001) + cx
+    v_pixel = v_tilde / (pixel_h * .001) + cy
+
+    #assert False
 
     return u_pixel, v_pixel
 
