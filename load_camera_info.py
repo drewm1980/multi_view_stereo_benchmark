@@ -42,7 +42,10 @@ def load_halcon_intrinsics(filePath):
         assert key in expectedNames, 'Unhandled key found in intrinsics file!'
         value_string = line.split(':')[2].split(';')[0]
         if key in ('ImageWidth','ImageHeight'):
-            value = int(value_string)
+            float_value = float(value_string)
+            from numpy import round, abs
+            assert abs(round(float_value) - float_value)< .000001, key+' should be an integer!'
+            value = int(round(float_value))
         else:
             value = float(value_string)
         currentLine += 3
