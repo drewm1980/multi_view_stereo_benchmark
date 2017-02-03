@@ -50,6 +50,23 @@ def load_halcon_intrinsics(filePath):
             value = float(value_string)
         currentLine += 3
         d[key] = value
+
+    # If the camera has no radial distortion, fill in the ~other radial distortion model.
+    if 'Kappa' in d and d['Kappa'] == 0.0:
+        #print('Detected radial distortion free Polynomial model!')
+        d['Poly1'] = 0.0
+        d['Poly2'] = 0.0
+        d['Poly3'] = 0.0
+        d['Poly4'] = 0.0
+        d['Poly5'] = 0.0
+        return d
+    if 'Poly5' in d and all((d['Poly1'] == 0.0, d['Poly2'] == 0.0,
+                            d['Poly3'] == 0.0, d['Poly4'] == 0.0,
+                            d['Poly5'] == 0.0)):
+        #print('Detected radial distortion free Division model!')
+        d['Kappa'] = 0.0
+        return d
+
     return d
 
 
