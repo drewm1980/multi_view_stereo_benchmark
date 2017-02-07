@@ -67,6 +67,11 @@ def load_halcon_intrinsics(filePath):
         d['Kappa'] = 0.0
         return d
 
+    if 'Kappa' in d:
+        print('Loading a camera with non-zero kappa... sanity checking distortion model invertiblity...')
+        from .camera_models import check_distortion_model_invertability
+        check_distortion_model_invertability(d)
+
     return d
 
 
@@ -143,7 +148,16 @@ def rodriguez_vector_to_SO3(a1,a2,a3, implementation='giplib'):
 
 
 def load_halcon_extrinsics_rodriguez(filePath):
-    """ Load directly from HALCON's ascii format for camera extrinsics."""
+    """ Load directly from HALCON's ascii format for camera extrinsics.
+        HALCON supports 12 different rotation parameterizations.
+        As a result, their write_pose function writes ascii files that
+        could be any of them.
+        This function attempts to load these ascii files and convert
+        the results to a homogeneous matrix representation that maps camera
+        coordinates to world coordinates.
+        For the documentation for HALCON's rotation parameterization codes
+        see the table in the documentation for the create_pose operator.
+        """
     assert filePath.is_file()
     try:
         lines = filePath.open().readlines()
@@ -156,6 +170,8 @@ def load_halcon_extrinsics_rodriguez(filePath):
     lines = map(lambda line: line.strip(), lines)
     lines = list(lines)
 
+    rotation_parameterization_code = -1 # Sentinel for "not set"
+
     d = {}
     expected_keys = set(('f','r','t'))
     for line in lines:
@@ -163,21 +179,43 @@ def load_halcon_extrinsics_rodriguez(filePath):
         assert key in expected_keys, "Unrecognized character at start of line while parsing extrinsics!"
         expected_keys.remove(key)
         if line[0]=='f':
-            assert line.split(' ')[1]=='0', 'Representation type not handled!'
+            rotation_parameterization_code = int(line.split(' ')[1])
             continue
         value = numpy.array(tuple(map(float,list(line.split(' '))[1:])))
         d[key] = value
 
     anglevector = d['r']*numpy.pi/180 # Supposedly the angles in the ascii files are in degrees... 
-    R = rodriguez_vector_to_SO3(anglevector[0], anglevector[1], anglevector[2])
-    t = d['t']
-    return R,t
+    if rotation_parameterization_code == -1:
+        assert False, 'Unable to find the rotation parameterization code in the file '+str(filePath)
+    elif rotation_parameterization_code == 0:
+        # gba euler angles. R = Rx * Ry * Rz
+        from numpy import sin,cos,pi
+        rx,ry,rz = anglevector[0], anglevector[1], anglevector[2] # Still in radians
+        Rx = numpy.matrix([[1,0,0],
+                        [0,cos(rx),-sin(rx)],
+                        [0,sin(rx),cos(rx)]])
+        Ry = numpy.matrix([[cos(ry),0,sin(ry)],
+                        [0,1,0],
+                        [-sin(ry),0,cos(ry)]])
+        Rz = numpy.matrix([[cos(rz),-sin(rz),0],
+                        [sin(rz),cos(rz),0],
+                        [0,0,1]])
+        R = numpy.array(Rx*Ry*Rz) # Matrix multiplication
+        T = d['t']
+        #print('R=',R,'T=',T)
+        #R,T = R.T,numpy.dot(-R.T,T) # Invert the transform so it maps world to camera
+    else:
+        assert False, "Sorry, rotation parameterization "+str(rotation_parameterization_code)+"not handled yet!"
+    # This will be needed for codes 4,5,12, and 13
+    #R = rodriguez_vector_to_SO3(anglevector[0], anglevector[1], anglevector[2])
+    return R,T
 
 
 def load_halcon_extrinsics_homogeneous(filePath):
-    """ HALCON is able to export camera extrinsics as a homogeneous matrix
-        stored in an ascii text file. This export format is the easies to deal
-        with.
+    """ HALCON has a function for converting camera extrinsics (Pose) to a 
+        homogeneous matrix. Often I use this function to write out the
+        homogeneous transformation to an ASCII file. This function loads
+        that format.
         Input:
         filePath -- The path of the text file containing the homogeous matrix
         Output:

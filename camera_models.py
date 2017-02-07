@@ -26,7 +26,7 @@ def undistort_division(u_tilde, v_tilde, kappa):
     v = scaling * v_tilde
     return u, v
 
-def distort_division(u,v, kappa):
+def distort_division(u, v, kappa):
     """
     From the HALCON Docs:
 
@@ -36,6 +36,7 @@ def distort_division(u,v, kappa):
     r_squared = u**2 + v**2
     temp = 1.0 - 4.0 * kappa * r_squared
     scaling = 2.0 / (1.0 + sqrt(temp))
+    #print('scaling=',scaling)
     u_tilde = scaling * u
     v_tilde = scaling * v
     return u_tilde, v_tilde
@@ -68,19 +69,8 @@ def undistort_polynomial(u_tilde, v_tilde, k1, k2, k3, p1, p2):
     v = v_tilde = v_tilde * temp1 + 2 * p1 * uv_tilde + p2 * (r_to_2 + 2 * v_tilde_to_2)
     return u,v
 
-def test_division_model_invertability(tests=20, kappa=0):
-    """ Test if the division actually inverts """
-    u_tilde = numpy.random.randn(tests)
-    v_tilde = numpy.random.randn(tests)
-    u,v = undistort_division(u_tilde,v_tilde,kappa)
-    u_tilde2,v_tilde2 = distort_division(u,v,kappa)
-    from numpy import all, abs
-    eps = .000001
-    assert all(abs(u_tilde-u_tilde2)<eps)
-    assert all(abs(v_tilde-v_tilde2)<eps)
-
 def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
-                        cy, kappa=0.0):
+                        cy, kappa=None):
     """ Project a 3D point into a sensor plane and
     simulate lens distortion to get (sub)pixel coordinates.
     This applies the camera's intrinsic / internal parameters.
@@ -99,6 +89,9 @@ def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
     pixel_h,pixel_w - height and width of a sensor pixel in mm! This is to be consistent with giplib.
     cx,cy - the center of the sensor optical axis in pixels
     kappa - the division model radial distortion parameter as defined by halcon.  """
+    if kappa is None:
+        kappa = 0.0
+        print('Warning, kappa was not explicitly set!')
     f_meters = f * 0.001
     x_projected = x * f_meters / z
     y_projected = y * f_meters / z
@@ -108,6 +101,7 @@ def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
     u = x_projected
     v = y_projected
     if kappa != 0.0 and kappa != -0.0:
+        print('Non-zero Kappa! Applying radial distortion!')
         u_tilde, v_tilde = distort_division(u, v, kappa)
     else:
         u_tilde, v_tilde = u, v
@@ -120,6 +114,33 @@ def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
 
     return u_pixel, v_pixel
 
+
+# Check division model invertibility for a specific camera
+def check_distortion_model_invertability(intrinsics):
+    u_grid = numpy.arange(intrinsics['ImageWidth']).astype(numpy.float64)
+    v_grid = numpy.arange(intrinsics['ImageHeight']).astype(numpy.float64)
+    u, v= numpy.meshgrid(u_grid,v_grid,sparse=False)
+    u -= intrinsics['Cx']
+    v -= intrinsics['Cy']
+    u *= intrinsics['Sx'] # in the HALCON .dat files it seems the values are in meters
+    v *= intrinsics['Sy']
+    kappa = intrinsics['Kappa']
+
+    # Distort and undistort
+    u_tilde,v_tilde = distort_division(u,v,kappa)
+    from numpy import all, abs
+    assert not all(abs(u_tilde-u)<intrinsics['Sx']), 'Warning: Distortion is at most sub-pixel! Probably a bug!'
+    assert not all(abs(v_tilde-v)<intrinsics['Sy']), 'Warning: Distortion is at most sub-pixel! Probably a bug!'
+    u2,v2 = undistort_division(u_tilde,v_tilde,kappa)
+    eps = .001*intrinsics['Sx'] # a thousandth of a pixel
+    assert all(abs(u-u2)<eps) and all(abs(v-v2)<eps), 'Camera intrinsics are not invertible on the image domain!'
+
+    # Undistort then Distort
+    u_tilde,v_tilde = undistort_division(u,v,kappa)
+    assert not all(abs(u_tilde-u)<intrinsics['Sx']), 'Warning: Distortion is at most sub-pixel! Probably a bug!'
+    assert not all(abs(v_tilde-v)<intrinsics['Sy']), 'Warning: Distortion is at most sub-pixel! Probably a bug!'
+    u2,v2 = distort_division(u_tilde,v_tilde,kappa)
+    assert all(abs(u-u2)<eps) and all(abs(v-v2)<eps), 'Camera intrinsics are not invertible on the image domain!'
 
 if __name__=='__main__':
     test_division_model_invertability(1)
