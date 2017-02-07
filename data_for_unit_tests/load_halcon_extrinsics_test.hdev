@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.1" halcon_version="12.0.2">
+<procedure name="main">
+<interface/>
+<body>
+<l>read_camera_setup_model('/home/awagner/XXXX_Plaroma3D/data/test/test_calibration_halcon12/camera_setup_model.csm',CameraSetupModelID)</l>
+<l>get_camera_setup_param(CameraSetupModelID,'general','num_cameras',NumCameras)</l>
+<l>for CameraIdx:=0 to NumCameras-1 by 1</l>
+<l>    get_camera_setup_param(CameraSetupModelID,CameraIdx,'pose',Pose)</l>
+<c>    </c>
+<c>    * Write the camera pose to a file with the undocumented rotation parameterization</c>
+<l>    filename := 'extrinsics_camera'+(CameraIdx+1)$'.2d'+'_rodriguez'</l>
+<l>    write_pose(Pose,filename+'.txt')</l>
+<c>    </c>
+<c>    * Write out the camera pose as a more error-proof homogeneous matrix.</c>
+<l>    pose_to_hom_mat3d(Pose,HomMat3D)</l>
+<l>    filename := 'extrinsics_camera'+(CameraIdx+1)$'.2d'+'_homogeneous'</l>
+<l>    pose_to_hom_mat3d(Pose,HomMat3D)</l>
+<l>    open_file(filename+'.txt','output',FileHandle)</l>
+<l>    for paramIndex := 0 to 11 by 1</l>
+<l>         fwrite_string(FileHandle,[HomMat3D[paramIndex], ' '])</l>
+<l>    endfor</l>
+<l>    close_file(FileHandle)</l>
+<l>endfor</l>
+<c></c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+</hdevelop>
