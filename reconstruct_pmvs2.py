@@ -302,7 +302,10 @@ pmvsOptionsDict = {
                                 sequence=-1,
                                 timages=None,
                                 oimages=0,
-                                numNeighbors=2)
+                                numNeighbors=2),
+    'pmvs_medium': PMVS2Options(
+        numCameras=12, level=1, csize=4,
+        numNeighbors=2)
     #,
     #'pmvs_2_2_1': PMVS2Options(
         #numCameras=12, level=2, csize=2,
