@@ -5,6 +5,7 @@
 import numpy
 import pathlib
 from pathlib import Path
+from time import time
 
 import os
 import inspect
@@ -24,7 +25,7 @@ import cv2
 # stereo matchers.
 
 class StereoBMOptions():
-    def __init__(self, 
+    def __init__(self,
             num_cameras=12,
             topology='overlapping',
             rectification_interpolation=cv2.INTER_LINEAR,
@@ -51,36 +52,47 @@ class StereoBMOptions():
 class StereoSGBMOptions():
     def __init__(self,
             num_cameras=12,
+            channels=None,
             topology='overlapping',
-            minDisparity = -1000,
+            minDisparity = 0,
             numDisparities = None,
-            SADWindowSize = 16,
+            blockSize = 16,
             P1 = None,
             P2 = None,
             disp12MaxDiff=1,
+            preFilterCap=31,
             uniquenessRatio=10,
             speckleWindowSize=100,
-            speckleRange=32
+            speckleRange=32,
+            mode = (cv2.StereoSGBM_MODE_SGBM, cv2.StereoSGBM_MODE_HH, cv2.StereoSGBM_MODE_SGBM_3WAY)[0]
             ):
         self.num_cameras = num_cameras
         self.topology = topology
         self.minDisparity = minDisparity
         if numDisparities is None:
-            self.numDisparities = 1000 - self.minDisparity
-        self.SADWindowSize = SADWindowSize
+            #self.numDisparities = 16*60 # 960
+            #self.numDisparities = 16*11 # 176
+            self.numDisparities = 16*5 # 176
+        else:
+            self.numDisparities = numDisparities
+        assert self.numDisparities%16==0, 'numDisparities must be a multiple of 16!'
+        self.blockSize = blockSize
+        assert channels is not None, 'StereoSGBMOptions need to know how many channels there are!'
+        self.channels = channels
         if P1 is None:
-            P1 = 8*3*SADWindowSize**2
+            self.P1 = 8*channels*blockSize**2
         else:
             self.P1 = P1
         if P2 is None:
-            P2 = 32*3*SADWindowSize**2
+            self.P2 = 32*channels*blockSize**2
         else:
             self.P2 = P2
-        self.P2 = P2
-        self.disp12MaxDiff=disp12MaxDiff,
+        self.disp12MaxDiff=disp12MaxDiff
+        self.preFilterCap=preFilterCap
         self.uniquenessRatio=uniquenessRatio
         self.speckleWindowSize=speckleWindowSize
         self.speckleRange=speckleRange
+        self.mode = mode
 
     # Reasonable stereo matching topologies for a 12 camera ring. Note, there is an additional choice of whether to match in both directions.
 import collections
@@ -143,9 +155,9 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         #cv2.namedWindow("grayImage",cv2.WINDOW_NORMAL)
         #cv2.imshow("grayImage", grayImage)
         #cv2.waitKey(0)
-    #cv2.destroyAllWindows()
+        #cv2.destroyAllWindows()
 
-    # Load the camera parameters
+        # Load the camera parameters
     all_camera_parameters = []
     for i in range(num_cameras):
         # Load the intrinsics
@@ -177,17 +189,77 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         right_camera_matrix, right_R, right_T = all_camera_parameters[right_index]
 
         # Perform rectification; this is shared by OpenCV's algorithms
+        flags=0
+        #flags=cv2.CALIB_ZERO_DISPARITY
+        #alpha=-1
+        alpha=1
+        h, w = left_image.shape
+        print('h =',h,'w =',w)
+        dist_coefs = (0.0,0.0,0.0,0.0,0.0)
+        imageSize = (w, h)
+
+        #left_R,right_R,left_T,right_T=right_R,left_R,right_T,left_T # Swap for debugging
+        #left_R,right_R,left_T,right_T = left_R.T,right_R.T,numpy.dot(left_R.T,-left_T),numpy.dot(-right_R.T,-right_T) # invert for debugging
+
+        # For x1 = left_R*x0+left_T interpretation
+        #R = numpy.dot(right_R, left_R.T)
+        #T = right_T - numpy.dot(R, left_T)
+
+        # For x0 = left_R*x1+left_T interpretation
+        R = numpy.dot(left_R.T,right_R)
+        T = numpy.dot(left_R.T,right_T-left_T)
+
+        R1_rect, R2_rect, P1_rect, P2_rect, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(
+            left_camera_matrix,
+            dist_coefs,
+            right_camera_matrix,
+            dist_coefs,
+            imageSize,
+            R,
+            T,
+            flags=flags,
+            alpha=alpha)
+
+        # Create rectification maps
+        rectification_map_type = cv2.CV_16SC2
+        left_maps = cv2.initUndistortRectifyMap(left_camera_matrix,
+                                                dist_coefs,
+                                                R1_rect,
+                                                P1_rect,
+                                                imageSize,
+                                                m1type=rectification_map_type)
+        right_maps = cv2.initUndistortRectifyMap(right_camera_matrix,
+                                                 dist_coefs,
+                                                 R2_rect,
+                                                 P2_rect,
+                                                 imageSize,
+                                                 m1type=rectification_map_type)
+
+        # Apply the rectification maps
+        left_image_rectified = cv2.remap(left_image, left_maps[0],
+                                         left_maps[1], cv2.INTER_LINEAR)
+        right_image_rectified = cv2.remap(right_image, right_maps[0],
+                                          right_maps[1], cv2.INTER_LINEAR)
 
         if type(options)==StereoSGBMOptions:
             # Perform stereo matching using SGBM
-            pass
+            create_matcher = cv2.StereoSGBM_create
         elif type(options) == StereoBMOptions:
             # Perform stereo matching using normal block matching
-            pass
+            create_matcher = cv2.StereoBM_create
+        matching_options = options.__dict__.copy()
+        del matching_options['topology']
+        del matching_options['num_cameras']
+        del matching_options['channels']
+        matcher = create_matcher(**matching_options)
+        print('computing disparity...')
+
+        disparity_image = matcher.compute(left_image_rectified, right_image_rectified)
+        threedeeimage = cv2.reprojectImageTo3D(disparity_image, Q, handleMissingValues=False,ddepth=cv2.CV_32F)
 
         # Convert the depth map to a point cloud
 
-    
+
     t2 = time()
     dt = t2-t1 # seconds. 
 
@@ -215,7 +287,7 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
 
 
 # Some hard-coded options, roughly slow to fast
-opencvOptionsDict = {'sgbm_defaults': StereoSGBMOptions(), 'bm_defaults':StereoBMOptions()}
+opencvOptionsDict = {'sgbm_defaults': StereoSGBMOptions(channels=1), 'bm_defaults':StereoBMOptions()}
 opencvOptionNames = opencvOptionsDict.keys()
 
 if __name__=='__main__':
