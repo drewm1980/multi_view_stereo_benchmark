@@ -213,7 +213,7 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
     threedeeimages = []
     # Run OpenCV on the pairs of images
     t1 = time()
-    #for right_index,left_index in topologies[options.topology]:
+    #for right_index,left_index in topologies[options.topology]: # doesn't work
     for left_index,right_index in topologies[options.topology]:
         left_image, right_image = images[left_index], images[right_index]
         left_camera_matrix, left_R, left_T = all_camera_parameters[left_index]
@@ -237,7 +237,7 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         #R = numpy.dot(left_R.T,right_R)
         #T = numpy.dot(left_R.T,right_T-left_T)
 
-        R1_rect, R2_rect, P1_rect, P2_rect, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(
+        left_R_rectified, right_R_rectified, P1_rect, P2_rect, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(
             cameraMatrix1 = left_camera_matrix,
             distCoeffs1 = dist_coefs,
             cameraMatrix2 = right_camera_matrix,
@@ -254,13 +254,13 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         #rectification_map_type = cv2.CV_32F 
         left_maps = cv2.initUndistortRectifyMap(left_camera_matrix,
                                                 dist_coefs,
-                                                R1_rect,
+                                                left_R_rectified,
                                                 P1_rect,
                                                 size=options.newImageSize,
                                                 m1type=rectification_map_type)
         right_maps = cv2.initUndistortRectifyMap(right_camera_matrix,
                                                  dist_coefs,
-                                                 R2_rect,
+                                                 right_R_rectified,
                                                  P2_rect,
                                                  size=options.newImageSize,
                                                  m1type=rectification_map_type)
@@ -314,6 +314,9 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
             #continue
 
         # Convert the depth map to a point cloud
+        print('Q.dtype=',Q.dtype)
+        print(Q)
+        
         threedeeimage = cv2.reprojectImageTo3D(disparity_image, Q, handleMissingValues=True,ddepth=cv2.CV_32F)
         #threedeeimage = cv2.reprojectImageTo3D(disparity_image, Q, handleMissingValues=True)
         threedeeimage = numpy.array(threedeeimage)
@@ -332,12 +335,23 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         print('pixels before filtering: ',h*w, "after filtering:" ,xyz_filtered.shape[0] )
 
         # If perspective is from left image:
-        #R,T = left_R, left_T
-        R,T = right_R, right_T
+        R,T = left_R, left_T
+        #R,T = right_R, right_T
+        #R,T = left_R_rectified, left_T  # nope
+        #R,T = left_R_rectified*left_R, left_T  # nope
+        #R,T = right_R_rectified, right_T 
+
+        xyz_filtered = numpy.dot(xyz_filtered, left_R_rectified) # NO IDEA WHY THIS IS NECESSARY! WTF?
+
+        R,T = R.T,numpy.dot(-R.T,T) # Invert direction of transformation to map camera to world. correct
         
-        #xyz_global = R*xyz_filtered.T + T
-        xyz_global = xyz_filtered
-        #xyz_global = numpy.dot(xyz_filtered, R.T) + T.T # Transposing because of right multiply
+        #xyz_global = xyz_filtered
+
+        xyz_filtered[0,:] = 0.0 # Debug: should make the camera centers visible.
+        xyz_filtered[1,:] = [0,0,0.005] # Debug: should make the camera direction visible
+        xyz_filtered[2,:] = [0,0,0.03] # Debug: should make the camera direction visible.
+
+        xyz_global = numpy.dot(xyz_filtered, R.T) + T.T # Transposing because of right multiply
         save_ply_file(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
 
     t2 = time()
@@ -377,5 +391,5 @@ if __name__=='__main__':
     workDirectory=Path('working_directory_opencv')
     #options = opencvOptionsDict['sgbm_defaults']
     options = opencvOptionsDict['bm_defaults']
-    run_opencv(imagesPath, workDirectory=workDirectory, options=options, VISUAL_DEBUG=True)
+    run_opencv(imagesPath, workDirectory=workDirectory, options=options, VISUAL_DEBUG=False)
     #run_opencv(imagesPath, options=options) # to test temp directory
