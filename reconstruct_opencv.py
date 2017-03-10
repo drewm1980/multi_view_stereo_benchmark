@@ -250,7 +250,8 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
             alpha=options.alpha)
 
         # Create rectification maps
-        rectification_map_type = cv2.CV_16SC2
+        rectification_map_type = cv2.CV_16SC2 
+        #rectification_map_type = cv2.CV_32F 
         left_maps = cv2.initUndistortRectifyMap(left_camera_matrix,
                                                 dist_coefs,
                                                 R1_rect,
@@ -299,6 +300,11 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         print('computing disparity...')
 
         disparity_image = matcher.compute(left_image_rectified, right_image_rectified)
+        # WARNING! OpenCV 3 Apparently doesn't support floating point disparity anymore,
+        # and 16 bit disparity needs to be divided by 16
+        if disparity_image.dtype == numpy.int16:
+            disparity_image = disparity_image.astype(numpy.float32)
+            disparity_image /= 16
 
         if VISUAL_DEBUG:
             im = numpy.array(disparity_image)
