@@ -94,7 +94,8 @@ class StereoSGBMOptions():
         self.speckleRange=speckleRange
         self.mode = mode
 
-    # Reasonable stereo matching topologies for a 12 camera ring. Note, there is an additional choice of whether to match in both directions.
+    # Reasonable stereo matching topologies for a 12 camera ring. Note, there is an additional choice of whether to match in both directions. 
+    # Note that whether this is (left,right) or (right,left) depends on whether the cameras are right side up or upside down!
 import collections
 topologies = collections.OrderedDict()
 topologies['overlapping'] = tuple(zip((0,1,2,3,4,5,6,7,8,9,10,11),
@@ -107,7 +108,7 @@ topologies['skipping_2'] = tuple(zip((0,4,8),
                  (1,5,9)))
 
 
-def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None):
+def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None, VISUAL_DEBUG=False):
     """ Run OpenCV's stereo matcher on a directory full of images.
 
         The images must ALREADY be radially undistorted!
@@ -122,6 +123,8 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
     """
     import shutil
     import glob
+    if VISUAL_DEBUG:
+        import pylab
 
     # By default, work in a temporary directory.
     # "with...as" ensures the temp directory is cleared even if there is an error below.
@@ -133,7 +136,8 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
                      destFile=destFile,
                      options=options,
                      runtimeFile=runtimeFile,
-                     workDirectory=Path(workDirectory))
+                     workDirectory=Path(workDirectory),
+                     VISUAL_DEBUG=VISUAL_DEBUG)
         return
     if not workDirectory.is_dir():
         workDirectory.mkdir()
@@ -183,7 +187,8 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
 
     # Run OpenCV on the pairs of images
     t1 = time()
-    for left_index,right_index in topologies[options.topology]:
+    #for right_index,left_index in topologies[options.topology][0:1]:
+    for left_index,right_index in topologies[options.topology][1:2]:
         left_image, right_image = images[left_index], images[right_index]
         left_camera_matrix, left_R, left_T = all_camera_parameters[left_index]
         right_camera_matrix, right_R, right_T = all_camera_parameters[right_index]
@@ -198,16 +203,13 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         dist_coefs = (0.0,0.0,0.0,0.0,0.0)
         imageSize = (w, h)
 
-        #left_R,right_R,left_T,right_T=right_R,left_R,right_T,left_T # Swap for debugging
-        #left_R,right_R,left_T,right_T = left_R.T,right_R.T,numpy.dot(left_R.T,-left_T),numpy.dot(-right_R.T,-right_T) # invert for debugging
-
         # For x1 = left_R*x0+left_T interpretation
-        #R = numpy.dot(right_R, left_R.T)
-        #T = right_T - numpy.dot(R, left_T)
+        R = numpy.dot(right_R, left_R.T)
+        T = right_T - numpy.dot(R, left_T)
 
         # For x0 = left_R*x1+left_T interpretation
-        R = numpy.dot(left_R.T,right_R)
-        T = numpy.dot(left_R.T,right_T-left_T)
+        #R = numpy.dot(left_R.T,right_R)
+        #T = numpy.dot(left_R.T,right_T-left_T)
 
         R1_rect, R2_rect, P1_rect, P2_rect, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(
             left_camera_matrix,
@@ -241,6 +243,14 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         right_image_rectified = cv2.remap(right_image, right_maps[0],
                                           right_maps[1], cv2.INTER_LINEAR)
 
+        if VISUAL_DEBUG:
+            left = numpy.array(left_image_rectified)
+            right = numpy.array(right_image_rectified)
+            leftright = numpy.hstack((left,right))
+            pylab.imshow(leftright)
+            pylab.show()
+            return
+
         if type(options)==StereoSGBMOptions:
             # Perform stereo matching using SGBM
             create_matcher = cv2.StereoSGBM_create
@@ -256,6 +266,11 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
 
         disparity_image = matcher.compute(left_image_rectified, right_image_rectified)
         threedeeimage = cv2.reprojectImageTo3D(disparity_image, Q, handleMissingValues=False,ddepth=cv2.CV_32F)
+
+        if VISUAL_DEBUG:
+            im = numpy.array(disparity_image)
+            pylab.imshow(im)
+            pylab.show()
 
         # Convert the depth map to a point cloud
 
@@ -283,7 +298,7 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         print(".ply file wasn't generated!")
         print('modelsDir: ' + str(modelsDir))
         print('plyPath: ' + str(plyPath))
-        assert False
+        assert False, 'a .ply file was not generated; reconstruction must have failed!'
 
 
 # Some hard-coded options, roughly slow to fast
@@ -295,5 +310,5 @@ if __name__=='__main__':
     imagesPath = Path('data/undistorted_images/2016_10_24__17_43_02')
     workDirectory=Path('working_directory_opencv')
     options = opencvOptionsDict['sgbm_defaults']
-    run_opencv(imagesPath, workDirectory=workDirectory, options=options)
+    run_opencv(imagesPath, workDirectory=workDirectory, options=options, VISUAL_DEBUG=True)
     #run_opencv(imagesPath, options=options) # to test temp directory
