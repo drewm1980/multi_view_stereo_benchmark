@@ -31,6 +31,20 @@ def load_ply_using_library(filename):
     return outdata, columnnames, columntypes
 
 
+def save_ply_file(xyz,filename):
+    """ Dump a point cloud to an ascii ply file."""
+    assert len(xyz.shape) == 2
+    assert xyz.shape[1] == 3
+    header="""ply
+format ascii 1.0
+element vertex """+str(xyz.shape[0])+"""
+property float x
+property float y
+property float z
+end_header"""
+    numpy.savetxt(filename,xyz,header=header,fmt='%.8f',comments='')
+
+
 def load_ply(filename, enableCaching=True):
     """ Load an ascii based .ply file.
         Inputs:
@@ -94,7 +108,7 @@ def load_ply(filename, enableCaching=True):
         header_lines += 1
 
         nextline = file.readline().strip().split(' ')
-        
+
     assert nextline[0] == 'end_header'
     header_lines += 1
 
