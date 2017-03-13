@@ -203,9 +203,9 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         R,T = R.T,numpy.dot(-R.T,T)
         all_camera_parameters.append((cameraMatrix, R, T))
 
-    threedeeimages = []
     # Run OpenCV on the pairs of images
     t1 = time()
+    xyz_global_array = []
     for left_index,right_index in topologies[options.topology]:
         left_image, right_image = images[left_index], images[right_index]
         left_camera_matrix, left_R, left_T = all_camera_parameters[left_index]
@@ -237,6 +237,8 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
             T=T,
             flags=flags,
             alpha=options.alpha)
+        # Geometry note: left_R_rectified above is apparently the rotation that does rectification, i.e
+        #   something close to an identity matrix, NOT the new transformation back to global coordinates.
 
         # Create rectification maps
         rectification_map_type = cv2.CV_16SC2 
@@ -315,7 +317,7 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
             #continue
 
         # Put the 3D images in a unified coordinate system...
-        xyz = threedeeimage.reshape((h*w,3)) # x,y,z now in three columns
+        xyz = threedeeimage.reshape((h*w,3)) # x,y,z now in three columns, in left rectified camera coordinates
 
         z = xyz[:,2]
         goodz = z < 1e3
@@ -323,17 +325,16 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         print('pixels before filtering: ',h*w, "after filtering:" ,xyz_filtered.shape[0] )
 
         R,T = left_R, left_T # perspective is from left image:
-
-        xyz_filtered = numpy.dot(xyz_filtered, left_R_rectified) # NO IDEA WHY THIS IS NECESSARY! WTF?
-
         R,T = R.T,numpy.dot(-R.T,T) # Invert direction of transformation to map camera to world. correct
-        
-        xyz_global = numpy.dot(xyz_filtered, R.T) + T.T # Transposing because of right multiply
-        save_ply_file(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
+        R_left_rectified_to_global = numpy.dot(R,left_R_rectified.T)
+        xyz_global = numpy.dot(xyz_filtered, R_left_rectified_to_global.T) + T.T  # TODO: combine this with the the multipilication by Q inside of reprojectImageTo3D above. Note that different filtering may be required.
 
+        #save_ply_file(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
+        xyz_global_array.append(xyz_global)
+
+    xyz = numpy.vstack(xyz_global_array)
     t2 = time()
     dt = t2-t1 # seconds. 
-    return
 
     ## Copy the file to the appropriate destination
     if destDir is None:
@@ -342,20 +343,13 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         destFile = 'reconstruction.ply'
         destPath = destDir / destFile
 
+    print('Saving reconstruction to',destPath,'...')
+    save_ply_file(xyz, destPath)
+
     if runtimeFile is None:
         runtimeFile = destPath.parent / (destPath.stem +'_runtime.txt')
     with open(str(runtimeFile), 'w') as fd:
         fd.write(str(dt)) # seconds
-
-    modelsDir = workDirectory / 'models'
-    plyPath = modelsDir / Path('option.txt' + '.ply')
-    if plyPath.is_file():
-        plyPath.rename(destPath)
-    else:
-        print(".ply file wasn't generated!")
-        print('modelsDir: ' + str(modelsDir))
-        print('plyPath: ' + str(plyPath))
-        assert False, 'a .ply file was not generated; reconstruction must have failed!'
 
 
 # Some hard-coded options, roughly slow to fast

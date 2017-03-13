@@ -42,7 +42,7 @@ property float x
 property float y
 property float z
 end_header"""
-    numpy.savetxt(filename,xyz,header=header,fmt='%.8f',comments='')
+    numpy.savetxt(str(filename),xyz,header=header,fmt='%.8f',comments='')
 
 
 def load_ply(filename, enableCaching=True):
