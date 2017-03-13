@@ -10,7 +10,7 @@ from time import time
 import shutil
 import glob
 
-from load_ply import save_ply_file
+from load_ply import save_ply
 
 import os
 import inspect
@@ -140,7 +140,9 @@ class OpenCVStereoMatcher():
 
         self.num_pairs = len(topologies)
         if type(matcher_options) is not list:
-            self.matcher_options = [matcher_options,]
+            self.matcher_options = [matcher_options]
+        else:
+            self.matcher_options = matcher_options
         if len(self.matcher_options) == 1:
             self.matcher_options *= self.num_cameras
 
@@ -153,7 +155,7 @@ class OpenCVStereoMatcher():
         self.Q_array = []
         self.extrinsics_left_rectified_to_global_array = []
 
-        for left_index,right_index in topologies[self.topology]:
+        for pair_index, (left_index,right_index) in enumerate(topologies[self.topology]):
             left_camera_matrix, left_R, left_T, left_width, left_height = self.all_camera_parameters[left_index]
             right_camera_matrix, right_R, right_T, right_width, right_height = self.all_camera_parameters[right_index]
             assert left_width == right_width, "Images of mismatched resolution is unsupported by opencv!"
@@ -170,6 +172,7 @@ class OpenCVStereoMatcher():
             left_distortion_coefficients = distortion_coefficients
             right_distortion_coefficients = distortion_coefficients
             imageSize = (w, h)
+            options = self.matcher_options[pair_index]
             if options.newImageSize == (0,0):
                 options.newImageSize = imageSize
 
@@ -199,7 +202,7 @@ class OpenCVStereoMatcher():
             R3,T3 = R2.T,numpy.dot(-R2.T,T2) # Invert direction of transformation to map camera to world. 
             R_left_rectified_to_global = numpy.dot(R3,left_R_rectified.T)
             T_left_rectified_to_global = T3
-            extrinsics_left_rectified_to_global = R_left_rectified_to_global, T_left_rectified_to_global
+            extrinsics_left_rectified_to_global = R_left_rectified_to_global.astype(numpy.float32), T_left_rectified_to_global.astype(numpy.float32)
             self.extrinsics_left_rectified_to_global_array.append(extrinsics_left_rectified_to_global)
 
             # Create rectification maps
@@ -300,7 +303,7 @@ class OpenCVStereoMatcher():
         xyz_global_array = []
         for pair_index, (left_index,right_index) in enumerate(topologies[self.topology]):
             print('Performing Stereo matching between cameras', left_index,'and',right_index,'...')
-            left_image, right_image = self.images[left_index], self.images[right_index]
+            left_image, right_image = images[left_index], images[right_index]
 
             
             left_maps = self.left_maps_array[pair_index]

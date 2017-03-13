@@ -12,7 +12,7 @@ pwd = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
 pmvs2Path = Path(pwd) / 'extern/CMVS-PMVS/program/main/pmvs2'
 assert pmvs2Path.is_file(), "pmvs2 binary not found. Try running bootstrap.sh?"
 
-from .load_camera_info import load_intrinsics, load_extrinsics
+from load_camera_info import load_intrinsics, load_extrinsics
 
 
 def set_up_visualize_subdirectory(inputPath,destPath):

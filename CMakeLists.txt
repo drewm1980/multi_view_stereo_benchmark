@@ -28,6 +28,7 @@ target_link_libraries(compare_clouds ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES}
 add_definitions(-DUSE_PCL)
 endif()
 target_compile_options(compare_clouds PRIVATE -std=c++11 -O3 -Werror -Wall -ffast-math -fopenmp)
+target_link_libraries(compare_clouds -lgomp)
 
 #add_executable(compare_clouds_bin compare_clouds.cpp)
 #set_target_properties(compare_clouds_bin PROPERTIES OUTPUT_NAME compare_clouds)

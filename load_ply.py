@@ -31,7 +31,7 @@ def load_ply_using_library(filename):
     return outdata, columnnames, columntypes
 
 
-def save_ply_file(xyz,filename):
+def save_ply(xyz,filename):
     """ Dump a point cloud to an ascii ply file."""
     assert len(xyz.shape) == 2
     assert xyz.shape[1] == 3
