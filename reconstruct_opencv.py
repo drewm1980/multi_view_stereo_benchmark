@@ -7,6 +7,9 @@ import pathlib
 from pathlib import Path
 from time import time
 
+import shutil
+import glob
+
 from load_ply import save_ply_file
 
 import os
@@ -135,39 +138,8 @@ class OpenCVStereoMatcher():
         if len(self.matcher_options) == 1:
             self.matcher_options *= self.num_cameras
 
-
-    def run_from_disk(self,
-                      imagesPath,
-                      destDir=None,
-                      destFile=None,
-                      workDirectory=None,
-                      runtimeFile=None,
-                      VISUAL_DEBUG=False):
-        """ Run OpenCV's stereo matcher on a directory full of images.
-
-            The images must ALREADY be radially undistorted!
-
-        Arguments:
-        imagesPath -- A directory full of source images
-        destDir -- The destination directory of the ply file. (default current directory)
-        destFile -- The destination name of the ply file. (default <name of the directory>.ply)
-        options -- An instance of OpenCVOptions
-        workDirectory -- Existing directory where intermediate results may be written for debugging. (default generates a temp directory)
-        runtimeFile -- The name of a file where info regarding the runtime will be stored.
-        """
-        import shutil
-        import glob
-        if VISUAL_DEBUG:
-            import pylab
-
-        # By default, work in a temporary directory.
-        # "with...as" ensures the temp directory is cleared even if there is an error below.
-        if workDirectory is None:
-            from tempfile import TemporaryDirectory
-            workDirectory = TemporaryDirectory(dir=str(Path(pwd)/'tmp'))
-        if not workDirectory.is_dir():
-            workDirectory.mkdir()
-
+    def load_images(self,imagesPath):
+        # Load a set of images from disk. Doesn't do processing yet.
         imagesPath = imagesPath.resolve()
 
         # Load the undistorted images off of disk
@@ -186,10 +158,12 @@ class OpenCVStereoMatcher():
             #cv2.imshow("grayImage", grayImage)
             #cv2.waitKey(0)
             #cv2.destroyAllWindows()
+        self.images = images
 
-            # Load the camera parameters
+    def load_camera_parameters(self, imagesPath):
+        # Load the camera parameters for every camera in the array
         all_camera_parameters = []
-        for i in range(num_cameras):
+        for i in range(self.num_cameras):
             # Load the intrinsics
             intrinsicsFilePath = imagesPath / ('intrinsics_camera%02i.txt' % (i + 1))
             print('Loading intrinsics for camera',i,'from',intrinsicsFilePath,'...')
@@ -210,17 +184,51 @@ class OpenCVStereoMatcher():
             # OpenCV expects the inverse of the transform that HALCON exports!
             R,T = R.T,numpy.dot(-R.T,T)
             all_camera_parameters.append((cameraMatrix, R, T))
+        self.all_camera_parameters = all_camera_parameters
 
+
+    def run_from_disk(self,
+                      imagesPath,
+                      destDir=None,
+                      destFile=None,
+                      workDirectory=None,
+                      runtimeFile=None,
+                      VISUAL_DEBUG=False):
+        """ Run OpenCV's stereo matcher on a directory full of images.
+
+            The images must ALREADY be radially undistorted!
+
+        Arguments:
+        imagesPath -- A directory full of source images
+        destDir -- The destination directory of the ply file. (default current directory)
+        destFile -- The destination name of the ply file. (default <name of the directory>.ply)
+        options -- An instance of OpenCVOptions
+        workDirectory -- Existing directory where intermediate results may be written for debugging. (default generates a temp directory)
+        runtimeFile -- The name of a file where info regarding the runtime will be stored.
+        """
+        if VISUAL_DEBUG:
+            import pylab
+
+        self.load_images(imagesPath)
+        self.load_camera_parameters(imagesPath)
+
+        # By default, work in a temporary directory.
+        # "with...as" ensures the temp directory is cleared even if there is an error below.
+        if workDirectory is None:
+            from tempfile import TemporaryDirectory
+            workDirectory = TemporaryDirectory(dir=str(Path(pwd)/'tmp'))
+        if not workDirectory.is_dir():
+            workDirectory.mkdir()
 
         # Run OpenCV on the pairs of images
         t1 = time()
         xyz_global_array = []
         for left_index,right_index in topologies[self.topology]:
             print('Performing Stereo matching between cameras', left_index,'and',right_index,'...')
-            left_image, right_image = images[left_index], images[right_index]
+            left_image, right_image = self.images[left_index], self.images[right_index]
 
-            left_camera_matrix, left_R, left_T = all_camera_parameters[left_index]
-            right_camera_matrix, right_R, right_T = all_camera_parameters[right_index]
+            left_camera_matrix, left_R, left_T = self.all_camera_parameters[left_index]
+            right_camera_matrix, right_R, right_T = self.all_camera_parameters[right_index]
 
             # TODO: use pyrDown to support downsampling the images by factors of two?
 
