@@ -82,7 +82,7 @@ def load_intrinsics(filePath):
         Input:
             filePath -- The name of the file to read
         Output:
-            The 3x3 camera projection matrix K and distortion coefficients.
+            The 3x3 camera projection matrix K, distortion coefficients, image width, and image height
             x_pixel_homogeneous = K*x_world
         """
     d = load_halcon_intrinsics(filePath)
@@ -111,7 +111,7 @@ def load_intrinsics(filePath):
     else:
         distCoeffs = ()
 
-    return cameraMatrix, distCoeffs
+    return cameraMatrix, distCoeffs, d['ImageWidth'], d['ImageHeight']
 
 
 def rodriguez_vector_to_SO3(a1,a2,a3, implementation='giplib'):

@@ -7,6 +7,7 @@
 # TODO: scrape these out of cmake somehow
 USE_PMVS2=1
 USE_GIPUMA=0
+USE_OPENCV=0
 
 # Generates the pmvs2 binary in extern/CMVS-PMVS/program/pmvs2
 if [ $USE_PMVS2 ]
@@ -28,6 +29,15 @@ then
 	(
 	cd extern/gipuma
 	cmake .
+	make
+	)
+fi
+
+if [ $USE_OPENCV ]
+then
+	(
+	cd extern/opencv/build
+	cmake ..
 	make
 	)
 fi

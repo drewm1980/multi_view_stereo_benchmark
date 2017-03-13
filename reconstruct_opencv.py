@@ -126,17 +126,24 @@ class OpenCVStereoMatcher():
     def __init__(self,
             matcher_options=[opencvOptionsDict['bm_defaults'],],
             num_cameras=12,
+            calibrationsPath=None,
             topology='overlapping',
             rectification_interpolation=cv2.INTER_LINEAR,
+            visual_debug=False,
             ):
         self.num_cameras = num_cameras
         self.topology = topology
         self.rectification_interpolation=rectification_interpolation
+        self.visual_debug = visual_debug
+
         self.num_pairs = len(topologies)
         if type(matcher_options) is not list:
             self.matcher_options = [matcher_options,]
         if len(self.matcher_options) == 1:
             self.matcher_options *= self.num_cameras
+
+        assert calibrationsPath is not None, 'To initialize an OpenCVStereoMatcher, you must provide a path to the dirctory containing camera intrinsics and extrinsics!'
+        self.load_camera_parameters(calibrationsPath)
 
     def load_images(self,imagesPath):
         # Load a set of images from disk. Doesn't do processing yet.
@@ -158,84 +165,62 @@ class OpenCVStereoMatcher():
             #cv2.imshow("grayImage", grayImage)
             #cv2.waitKey(0)
             #cv2.destroyAllWindows()
+            expected_parameters = self.all_camera_parameters[i]
+            w,h = expected_parameters[3], expected_parameters[4]
+            assert grayImage.shape == (h,w), 'Mismatch in image sizes!'
         self.images = images
 
-    def load_camera_parameters(self, imagesPath):
+    def free_images(self):
+        del self.images
+
+    def load_camera_parameters(self, calibrationsPath):
         # Load the camera parameters for every camera in the array
         all_camera_parameters = []
         for i in range(self.num_cameras):
             # Load the intrinsics
-            intrinsicsFilePath = imagesPath / ('intrinsics_camera%02i.txt' % (i + 1))
+            intrinsicsFilePath = calibrationsPath / ('intrinsics_camera%02i.txt' % (i + 1))
             print('Loading intrinsics for camera',i,'from',intrinsicsFilePath,'...')
             assert intrinsicsFilePath.is_file(), "Couldn't find camera intrinsics in "+str(intrinsicsFilePath)
-            cameraMatrix, distCoffs = load_intrinsics(intrinsicsFilePath)
+            camera_matrix, distortion_coefficients, image_width, image_height = load_intrinsics(intrinsicsFilePath)
             # The images must already be radially undistorted
-            assert(abs(distCoffs[0]) < .000000001)
-            assert(abs(distCoffs[1]) < .000000001)
-            assert(abs(distCoffs[2]) < .000000001)
-            assert(abs(distCoffs[3]) < .000000001)
-            assert(abs(distCoffs[4]) < .000000001)
+            assert(abs(distortion_coefficients[0]) < .000000001)
+            assert(abs(distortion_coefficients[1]) < .000000001)
+            assert(abs(distortion_coefficients[2]) < .000000001)
+            assert(abs(distortion_coefficients[3]) < .000000001)
+            assert(abs(distortion_coefficients[4]) < .000000001)
 
             # Load the extrinsics
-            extrinsicsFilePath = imagesPath / ('extrinsics_camera%02i.txt' % (i + 1))
+            extrinsicsFilePath = calibrationsPath / ('extrinsics_camera%02i.txt' % (i + 1))
             print('Loading extrinsics for camera',i,'from',extrinsicsFilePath,'...')
             R, T = load_extrinsics(extrinsicsFilePath)
 
             # OpenCV expects the inverse of the transform that HALCON exports!
             R,T = R.T,numpy.dot(-R.T,T)
-            all_camera_parameters.append((cameraMatrix, R, T))
+            all_camera_parameters.append((camera_matrix, R, T, image_width, image_height))
         self.all_camera_parameters = all_camera_parameters
 
+    def run_from_memory(self, images):
+        """ Perform stereo reconstruction on a set of images already in memory, and return results in memory. """
+        assert self.all_camera_parameters is not None, 'Camera parameters not loaded yet; You should run load_camera_parameters first!'
 
-    def run_from_disk(self,
-                      imagesPath,
-                      destDir=None,
-                      destFile=None,
-                      workDirectory=None,
-                      runtimeFile=None,
-                      VISUAL_DEBUG=False):
-        """ Run OpenCV's stereo matcher on a directory full of images.
-
-            The images must ALREADY be radially undistorted!
-
-        Arguments:
-        imagesPath -- A directory full of source images
-        destDir -- The destination directory of the ply file. (default current directory)
-        destFile -- The destination name of the ply file. (default <name of the directory>.ply)
-        options -- An instance of OpenCVOptions
-        workDirectory -- Existing directory where intermediate results may be written for debugging. (default generates a temp directory)
-        runtimeFile -- The name of a file where info regarding the runtime will be stored.
-        """
-        if VISUAL_DEBUG:
-            import pylab
-
-        self.load_images(imagesPath)
-        self.load_camera_parameters(imagesPath)
-
-        # By default, work in a temporary directory.
-        # "with...as" ensures the temp directory is cleared even if there is an error below.
-        if workDirectory is None:
-            from tempfile import TemporaryDirectory
-            workDirectory = TemporaryDirectory(dir=str(Path(pwd)/'tmp'))
-        if not workDirectory.is_dir():
-            workDirectory.mkdir()
-
-        # Run OpenCV on the pairs of images
         t1 = time()
         xyz_global_array = []
         for left_index,right_index in topologies[self.topology]:
             print('Performing Stereo matching between cameras', left_index,'and',right_index,'...')
             left_image, right_image = self.images[left_index], self.images[right_index]
 
-            left_camera_matrix, left_R, left_T = self.all_camera_parameters[left_index]
-            right_camera_matrix, right_R, right_T = self.all_camera_parameters[right_index]
+            left_camera_matrix, left_R, left_T, left_width, left_height = self.all_camera_parameters[left_index]
+            right_camera_matrix, right_R, right_T, right_width, right_height = self.all_camera_parameters[right_index]
+            assert left_width == right_width, "Images of mismatched resolution is untested!"
+            assert left_height == right_height, "Images of mismatched resolution is untested!"
+            h,w = left_height, left_width
 
             # TODO: use pyrDown to support downsampling the images by factors of two?
 
             # Perform rectification; this is shared by OpenCV's algorithms
             flags=0
             #flags=cv2.CALIB_ZERO_DISPARITY
-            h, w = left_image.shape
+
             dist_coefs = (0.0,0.0,0.0,0.0,0.0)
             imageSize = (w, h)
             if options.newImageSize == (0,0):
@@ -295,7 +280,7 @@ class OpenCVStereoMatcher():
             right_image_rectified = cv2.remap(right_image, right_maps[0],
                                               right_maps[1], self.rectification_interpolation)
 
-            #if VISUAL_DEBUG:
+            #if self.visual_debug:
             #left = numpy.array(left_image_rectified)
             #right = numpy.array(right_image_rectified)
             #leftright = numpy.hstack((left,right))
@@ -311,7 +296,7 @@ class OpenCVStereoMatcher():
                 disparity_image = disparity_image.astype(numpy.float32)
                 disparity_image /= 16
 
-            if VISUAL_DEBUG:
+            if self.visual_debug:
                 im = numpy.array(disparity_image)
                 #pylab.imshow(numpy.vstack((left_image,im,right_image)))
                 pylab.imshow(numpy.vstack((im,)))
@@ -321,7 +306,7 @@ class OpenCVStereoMatcher():
                 # Convert the depth map to a point cloud
             threedeeimage = cv2.reprojectImageTo3D(disparity_image, Q, handleMissingValues=True,ddepth=cv2.CV_32F)
             threedeeimage = numpy.array(threedeeimage)
-            #if VISUAL_DEBUG:
+            #if self.visual_debug:
             #depth_image = threedeeimage[:,:,2]
             #pylab.imshow(depth_image)
             #pylab.show()
@@ -346,6 +331,47 @@ class OpenCVStereoMatcher():
         xyz = numpy.vstack(xyz_global_array)
         t2 = time()
         dt = t2-t1 # seconds. 
+        
+        return xyz, dt
+
+    def run_from_disk(self,
+                      imagesPath,
+                      calibrationsPath=None,
+                      destDir=None,
+                      destFile=None,
+                      options = opencvOptionsDict['bm_defaults'],
+                      workDirectory=None,
+                      runtimeFile=None):
+        """ Run OpenCV's stereo matcher on a directory full of images.
+
+            The images must ALREADY be radially undistorted!
+
+        Arguments:
+        imagesPath -- A directory full of source images
+        destDir -- The destination directory of the ply file. (default current directory)
+        destFile -- The destination name of the ply file. (default <name of the directory>.ply)
+        options -- An instance of OpenCVOptions
+        workDirectory -- Existing directory where intermediate results may be written for debugging. (default generates a temp directory)
+        runtimeFile -- The name of a file where info regarding the runtime will be stored.
+        """
+        if self.visual_debug:
+            import pylab
+
+        self.load_images(imagesPath)
+
+        if calibrationsPath is not None:
+            self.load_camera_parameters(calibrationsPath)
+
+        # By default, work in a temporary directory.
+        # "with...as" ensures the temp directory is cleared even if there is an error below.
+        if workDirectory is None:
+            from tempfile import TemporaryDirectory
+            workDirectory = TemporaryDirectory(dir=str(Path(pwd)/'tmp'))
+        if not workDirectory.is_dir():
+            workDirectory.mkdir()
+
+        xyz, reconstruction_time = self.run_from_memory(self.images)
+        del self.images
 
         ## Copy the file to the appropriate destination
         if destDir is None:
@@ -360,18 +386,17 @@ class OpenCVStereoMatcher():
         if runtimeFile is None:
             runtimeFile = destPath.parent / (destPath.stem +'_runtime.txt')
         with open(str(runtimeFile), 'w') as fd:
-            fd.write(str(dt)) # seconds
+            fd.write(str(reconstruction_time)) # seconds
 
 
-def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None, VISUAL_DEBUG=False):
+def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None, visual_debug=False):
     """ An inefficent, but simple interface that doesn't precompute anything, and loads from disk. """
-    matcher = OpenCVStereoMatcher(matcher_options=options)
+    matcher = OpenCVStereoMatcher(matcher_options=options, calibrationsPath=imagesPath, visual_debug=visual_debug)
     matcher.run_from_disk(imagesPath=imagesPath,
                           destDir=destDir,
                           destFile=destFile,
                           workDirectory=workDirectory,
-                          runtimeFile=runtimeFile,
-                          VISUAL_DEBUG=VISUAL_DEBUG)
+                          runtimeFile=runtimeFile)
 
 
 if __name__=='__main__':
@@ -380,5 +405,5 @@ if __name__=='__main__':
     workDirectory=Path('working_directory_opencv')
     #options = opencvOptionsDict['sgbm_defaults'] # Still generating ludicrously large cloud. filtering broken.
     options = opencvOptionsDict['bm_defaults']
-    run_opencv(imagesPath=imagesPath, workDirectory=workDirectory, options=options, VISUAL_DEBUG=False)
+    run_opencv(imagesPath=imagesPath, workDirectory=workDirectory, options=options, visual_debug=False)
     #run_opencv(imagesPath, options=options) # to test temp directory

@@ -52,7 +52,7 @@ def set_up_middlebury_tree(inputPath, destPath):
     for i in range(numCameras):
         # Load the intrinsics
         intrinsicsFilePath = inputPath / ('intrinsics_camera%02i.txt' % (i + 1))
-        cameraMatrix, distCoffs = load_intrinsics(intrinsicsFilePath)
+        cameraMatrix, distCoffs, imageWidth, imageHeight = load_intrinsics(intrinsicsFilePath)
         # The images must already be radially undistorted
         assert(abs(distCoffs[0]) < .000000001)
         assert(abs(distCoffs[1]) < .000000001)
@@ -67,7 +67,7 @@ def set_up_middlebury_tree(inputPath, destPath):
 
         # Load the intrinsics
         intrinsicsFilePath = inputPath / ('intrinsics_camera%02i.txt' % (i + 1))
-        cameraMatrix, distCoffs = load_intrinsics(intrinsicsFilePath)
+        cameraMatrix, distCoffs, imageWidth, imageHeight = load_intrinsics(intrinsicsFilePath)
         K = cameraMatrix
 
         # TODO: Maybe I need to swap the meaning of x and y for middlebury?

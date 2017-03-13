@@ -66,7 +66,7 @@ def set_up_txt_subdirectory(inputPath,destPath):
         # Load the intrinsics
         intrinsicsFilePath = inputPath / ('intrinsics_camera%02i.txt' % (i + 1))
         assert intrinsicsFilePath.is_file(), "Couldn't find camera intrinsics in "+str(intrinsicsFilePath)
-        cameraMatrix, distCoffs = load_intrinsics(intrinsicsFilePath)
+        cameraMatrix, distCoffs, imageWidth, imageHeight = load_intrinsics(intrinsicsFilePath)
         # The images must already be radially undistorted
         assert(abs(distCoffs[0]) < .000000001)
         assert(abs(distCoffs[1]) < .000000001)
