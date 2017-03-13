@@ -122,6 +122,8 @@ topologies['skipping_2'] = tuple(zip((0,4,8),
 class OpenCVStereoMatcher():
     """ Wrapper class that applies OpenCV's stereo matchers pairwise on an array of cameras. 
         If a list of only one instance is passed in matcher_options, it will be used by all camera pairs.
+        Usage: Re-instantiate each time the camera geometry changes with a new calibrationsPath.
+            For each reconstruction, call either run_from_memory or run_from_disk depending on your use case.
     """
     def __init__(self,
             matcher_options=[opencvOptionsDict['bm_defaults'],],
@@ -144,6 +146,96 @@ class OpenCVStereoMatcher():
 
         assert calibrationsPath is not None, 'To initialize an OpenCVStereoMatcher, you must provide a path to the dirctory containing camera intrinsics and extrinsics!'
         self.load_camera_parameters(calibrationsPath)
+
+        self.left_maps_array = []
+        self.right_maps_array = []
+        self.matchers = []
+        self.Q_array = []
+        self.extrinsics_left_rectified_to_global_array = []
+
+        for left_index,right_index in topologies[self.topology]:
+            left_camera_matrix, left_R, left_T, left_width, left_height = self.all_camera_parameters[left_index]
+            right_camera_matrix, right_R, right_T, right_width, right_height = self.all_camera_parameters[right_index]
+            assert left_width == right_width, "Images of mismatched resolution is unsupported by opencv!"
+            assert left_height == right_height, "Images of mismatched resolution is unsupported by opencv!"
+            h,w = left_height, left_width
+
+            # TODO: use pyrDown to support downsampling the images by factors of two?
+
+            # Perform rectification; this is shared by OpenCV's algorithms
+            flags=0
+            #flags=cv2.CALIB_ZERO_DISPARITY
+
+            distortion_coefficients = (0.0,0.0,0.0,0.0,0.0)
+            left_distortion_coefficients = distortion_coefficients
+            right_distortion_coefficients = distortion_coefficients
+            imageSize = (w, h)
+            if options.newImageSize == (0,0):
+                options.newImageSize = imageSize
+
+            # Form the transformation between the two camera frames, needed for stereoRectify.
+            R_intercamera = numpy.dot(right_R, left_R.T)
+            T_intercamera = right_T - numpy.dot(R_intercamera, left_T)
+
+            left_R_rectified, right_R_rectified, P1_rect, P2_rect, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(
+                cameraMatrix1 = left_camera_matrix,
+                distCoeffs1 = left_distortion_coefficients,
+                cameraMatrix2 = right_camera_matrix,
+                distCoeffs2 = right_distortion_coefficients,
+                imageSize=imageSize,
+                newImageSize=options.newImageSize,
+                R=R_intercamera,
+                T=T_intercamera,
+                flags=flags,
+                alpha=options.alpha)
+
+            self.Q_array.append(Q)
+
+            # Geometry note: left_R_rectified above is apparently the rotation that does rectification, i.e
+            #   something close to an identity matrix, NOT the new transformation back to global coordinates.
+
+            # Some geometry needed for converting disparity back to global coordinates
+            R2,T2 = left_R, left_T # perspective is from left image.
+            R3,T3 = R2.T,numpy.dot(-R2.T,T2) # Invert direction of transformation to map camera to world. 
+            R_left_rectified_to_global = numpy.dot(R3,left_R_rectified.T)
+            T_left_rectified_to_global = T3
+            extrinsics_left_rectified_to_global = R_left_rectified_to_global, T_left_rectified_to_global
+            self.extrinsics_left_rectified_to_global_array.append(extrinsics_left_rectified_to_global)
+
+            # Create rectification maps
+            rectification_map_type = cv2.CV_16SC2
+            left_maps = cv2.initUndistortRectifyMap(left_camera_matrix,
+                                                    left_distortion_coefficients,
+                                                    left_R_rectified,
+                                                    P1_rect,
+                                                    size=options.newImageSize,
+                                                    m1type=rectification_map_type)
+            right_maps = cv2.initUndistortRectifyMap(right_camera_matrix,
+                                                     right_distortion_coefficients,
+                                                     right_R_rectified,
+                                                     P2_rect,
+                                                     size=options.newImageSize,
+                                                     m1type=rectification_map_type)
+            self.left_maps_array.append(left_maps)
+            self.right_maps_array.append(right_maps)
+
+            # Instantiate the matchers; they may do something slow internally...
+            matching_options = options.__dict__.copy()
+            del matching_options['channels']
+            del matching_options['newImageSize']
+            del matching_options['alpha']
+            if type(options)==StereoSGBMOptions:
+                # Perform stereo matching using SGBM
+                create_matcher = cv2.StereoSGBM_create
+                matcher = create_matcher(**matching_options)
+            elif type(options) == StereoBMOptions:
+                # Perform stereo matching using normal block matching
+                create_matcher = cv2.StereoBM_create
+                del matching_options['preset']
+                matcher = create_matcher(**matching_options)
+            self.matchers.append(matcher)
+            
+
 
     def load_images(self,imagesPath):
         # Load a set of images from disk. Doesn't do processing yet.
@@ -203,76 +295,16 @@ class OpenCVStereoMatcher():
         """ Perform stereo reconstruction on a set of images already in memory, and return results in memory. """
         assert self.all_camera_parameters is not None, 'Camera parameters not loaded yet; You should run load_camera_parameters first!'
 
+
         t1 = time()
         xyz_global_array = []
-        for left_index,right_index in topologies[self.topology]:
+        for pair_index, (left_index,right_index) in enumerate(topologies[self.topology]):
             print('Performing Stereo matching between cameras', left_index,'and',right_index,'...')
             left_image, right_image = self.images[left_index], self.images[right_index]
 
-            left_camera_matrix, left_R, left_T, left_width, left_height = self.all_camera_parameters[left_index]
-            right_camera_matrix, right_R, right_T, right_width, right_height = self.all_camera_parameters[right_index]
-            assert left_width == right_width, "Images of mismatched resolution is untested!"
-            assert left_height == right_height, "Images of mismatched resolution is untested!"
-            h,w = left_height, left_width
-
-            # TODO: use pyrDown to support downsampling the images by factors of two?
-
-            # Perform rectification; this is shared by OpenCV's algorithms
-            flags=0
-            #flags=cv2.CALIB_ZERO_DISPARITY
-
-            dist_coefs = (0.0,0.0,0.0,0.0,0.0)
-            imageSize = (w, h)
-            if options.newImageSize == (0,0):
-                options.newImageSize = imageSize
-
-            # Form the transformation between the two camera frames, needed for stereoRectify.
-            R_intercamera = numpy.dot(right_R, left_R.T)
-            T_intercamera = right_T - numpy.dot(R_intercamera, left_T)
-
-            left_R_rectified, right_R_rectified, P1_rect, P2_rect, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(
-                cameraMatrix1 = left_camera_matrix,
-                distCoeffs1 = dist_coefs,
-                cameraMatrix2 = right_camera_matrix,
-                distCoeffs2 = dist_coefs,
-                imageSize=imageSize,
-                newImageSize=options.newImageSize,
-                R=R_intercamera,
-                T=T_intercamera,
-                flags=flags,
-                alpha=options.alpha)
-            # Geometry note: left_R_rectified above is apparently the rotation that does rectification, i.e
-            #   something close to an identity matrix, NOT the new transformation back to global coordinates.
-
-            # Create rectification maps
-            rectification_map_type = cv2.CV_16SC2
-            left_maps = cv2.initUndistortRectifyMap(left_camera_matrix,
-                                                    dist_coefs,
-                                                    left_R_rectified,
-                                                    P1_rect,
-                                                    size=options.newImageSize,
-                                                    m1type=rectification_map_type)
-            right_maps = cv2.initUndistortRectifyMap(right_camera_matrix,
-                                                     dist_coefs,
-                                                     right_R_rectified,
-                                                     P2_rect,
-                                                     size=options.newImageSize,
-                                                     m1type=rectification_map_type)
-
-            # Instantiate the matchers; they may do something slow internally...
-            matching_options = options.__dict__.copy()
-            del matching_options['channels']
-            del matching_options['newImageSize']
-            del matching_options['alpha']
-            if type(options)==StereoSGBMOptions:
-                # Perform stereo matching using SGBM
-                create_matcher = cv2.StereoSGBM_create
-                matcher = create_matcher(**matching_options)
-            elif type(options) == StereoBMOptions:
-                # Perform stereo matching using normal block matching
-                create_matcher = cv2.StereoBM_create
-                del matching_options['preset']
-                matcher = create_matcher(**matching_options)
+            
+            left_maps = self.left_maps_array[pair_index]
+            right_maps = self.right_maps_array[pair_index]
 
             # Apply the rectification maps
             left_image_rectified = cv2.remap(left_image, left_maps[0],
@@ -288,7 +320,7 @@ class OpenCVStereoMatcher():
             #pylab.show()
             #return
             #continue
-
+            matcher = self.matchers[pair_index]
             disparity_image = matcher.compute(left_image_rectified, right_image_rectified)
             # WARNING! OpenCV 3 Apparently doesn't support floating point disparity anymore,
             # and 16 bit disparity needs to be divided by 16
@@ -304,6 +336,7 @@ class OpenCVStereoMatcher():
                 #continue
 
                 # Convert the depth map to a point cloud
+            Q = self.Q_array[pair_index]
             threedeeimage = cv2.reprojectImageTo3D(disparity_image, Q, handleMissingValues=True,ddepth=cv2.CV_32F)
             threedeeimage = numpy.array(threedeeimage)
             #if self.visual_debug:
@@ -313,17 +346,15 @@ class OpenCVStereoMatcher():
             #continue
 
             # Put the 3D images in a unified coordinate system...
-            xyz = threedeeimage.reshape((h*w,3)) # x,y,z now in three columns, in left rectified camera coordinates
+            xyz = threedeeimage.reshape((-1,3)) # x,y,z now in three columns, in left rectified camera coordinates
 
             z = xyz[:,2]
             goodz = z < 1e3
             xyz_filtered = xyz[goodz,:]
             #print('pixels before filtering: ',h*w, "after filtering:" ,xyz_filtered.shape[0] )
 
-            R2,T2 = left_R, left_T # perspective is from left image.
-            R3,T3 = R2.T,numpy.dot(-R2.T,T2) # Invert direction of transformation to map camera to world. correct
-            R_left_rectified_to_global = numpy.dot(R3,left_R_rectified.T)
-            xyz_global = numpy.dot(xyz_filtered, R_left_rectified_to_global.T) + T3.T  # TODO: combine this with the the multipilication by Q inside of reprojectImageTo3D above. Note that different filtering may be required.
+            R_left_rectified_to_global, T_left_rectified_to_global = self.extrinsics_left_rectified_to_global_array[pair_index]
+            xyz_global = numpy.dot(xyz_filtered, R_left_rectified_to_global.T) + T_left_rectified_to_global.T  # TODO: combine this with the the multipilication by Q inside of reprojectImageTo3D above. Note that different filtering may be required.
 
             #save_ply_file(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
             xyz_global_array.append(xyz_global)
