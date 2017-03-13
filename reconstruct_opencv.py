@@ -207,6 +207,7 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
     t1 = time()
     xyz_global_array = []
     for left_index,right_index in topologies[options.topology]:
+        print('Performing Stereo matching between cameras', left_index,'and',right_index,'...')
         left_image, right_image = images[left_index], images[right_index]
         left_camera_matrix, left_R, left_T = all_camera_parameters[left_index]
         right_camera_matrix, right_R, right_T = all_camera_parameters[right_index]
@@ -223,8 +224,8 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
             options.newImageSize = imageSize
 
         # Form the transformation between the two camera frames, needed for stereoRectify.
-        R = numpy.dot(right_R, left_R.T)
-        T = right_T - numpy.dot(R, left_T)
+        R_intercamera = numpy.dot(right_R, left_R.T)
+        T_intercamera = right_T - numpy.dot(R_intercamera, left_T)
 
         left_R_rectified, right_R_rectified, P1_rect, P2_rect, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(
             cameraMatrix1 = left_camera_matrix,
@@ -233,8 +234,8 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
             distCoeffs2 = dist_coefs,
             imageSize=imageSize,
             newImageSize=options.newImageSize,
-            R=R,
-            T=T,
+            R=R_intercamera,
+            T=T_intercamera,
             flags=flags,
             alpha=options.alpha)
         # Geometry note: left_R_rectified above is apparently the rotation that does rectification, i.e
@@ -255,6 +256,24 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
                                                  size=options.newImageSize,
                                                  m1type=rectification_map_type)
 
+        # Instantiate the matchers; they may do something slow internally...
+        matching_options = options.__dict__.copy()
+        del matching_options['topology']
+        del matching_options['num_cameras']
+        del matching_options['channels']
+        del matching_options['newImageSize']
+        del matching_options['alpha']
+        del matching_options['rectification_interpolation']
+        if type(options)==StereoSGBMOptions:
+            # Perform stereo matching using SGBM
+            create_matcher = cv2.StereoSGBM_create
+            matcher = create_matcher(**matching_options)
+        elif type(options) == StereoBMOptions:
+            # Perform stereo matching using normal block matching
+            create_matcher = cv2.StereoBM_create
+            del matching_options['preset']
+            matcher = create_matcher(**matching_options)
+
         # Apply the rectification maps
         left_image_rectified = cv2.remap(left_image, left_maps[0],
                                          left_maps[1], options.rectification_interpolation)
@@ -269,25 +288,6 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         #pylab.show()
         #return
         #continue
-        matching_options = options.__dict__.copy()
-        del matching_options['topology']
-        del matching_options['num_cameras']
-        del matching_options['channels']
-        del matching_options['newImageSize']
-        del matching_options['alpha']
-        del matching_options['rectification_interpolation']
-
-        if type(options)==StereoSGBMOptions:
-            # Perform stereo matching using SGBM
-            create_matcher = cv2.StereoSGBM_create
-            matcher = create_matcher(**matching_options)
-        elif type(options) == StereoBMOptions:
-            # Perform stereo matching using normal block matching
-            create_matcher = cv2.StereoBM_create
-            del matching_options['preset']
-            print(matching_options)
-            matcher = create_matcher(**matching_options)
-        print('computing disparity...')
 
         disparity_image = matcher.compute(left_image_rectified, right_image_rectified)
         # WARNING! OpenCV 3 Apparently doesn't support floating point disparity anymore,
@@ -304,11 +304,7 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
             #continue
 
         # Convert the depth map to a point cloud
-        print('Q.dtype=',Q.dtype)
-        print(Q)
-        
         threedeeimage = cv2.reprojectImageTo3D(disparity_image, Q, handleMissingValues=True,ddepth=cv2.CV_32F)
-        #threedeeimage = cv2.reprojectImageTo3D(disparity_image, Q, handleMissingValues=True)
         threedeeimage = numpy.array(threedeeimage)
         #if VISUAL_DEBUG:
             #depth_image = threedeeimage[:,:,2]
@@ -322,12 +318,12 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         z = xyz[:,2]
         goodz = z < 1e3
         xyz_filtered = xyz[goodz,:]
-        print('pixels before filtering: ',h*w, "after filtering:" ,xyz_filtered.shape[0] )
+        #print('pixels before filtering: ',h*w, "after filtering:" ,xyz_filtered.shape[0] )
 
-        R,T = left_R, left_T # perspective is from left image:
-        R,T = R.T,numpy.dot(-R.T,T) # Invert direction of transformation to map camera to world. correct
-        R_left_rectified_to_global = numpy.dot(R,left_R_rectified.T)
-        xyz_global = numpy.dot(xyz_filtered, R_left_rectified_to_global.T) + T.T  # TODO: combine this with the the multipilication by Q inside of reprojectImageTo3D above. Note that different filtering may be required.
+        R2,T2 = left_R, left_T # perspective is from left image.
+        R3,T3 = R2.T,numpy.dot(-R2.T,T2) # Invert direction of transformation to map camera to world. correct
+        R_left_rectified_to_global = numpy.dot(R3,left_R_rectified.T)
+        xyz_global = numpy.dot(xyz_filtered, R_left_rectified_to_global.T) + T3.T  # TODO: combine this with the the multipilication by Q inside of reprojectImageTo3D above. Note that different filtering may be required.
 
         #save_ply_file(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
         xyz_global_array.append(xyz_global)
@@ -360,7 +356,7 @@ if __name__=='__main__':
     print('Attempting to run a reconstruction using opencv')
     imagesPath = Path('data/undistorted_images/2016_10_24__17_43_02')
     workDirectory=Path('working_directory_opencv')
-    #options = opencvOptionsDict['sgbm_defaults']
+    #options = opencvOptionsDict['sgbm_defaults'] # Still generating ludicrously large cloud. filtering broken.
     options = opencvOptionsDict['bm_defaults']
     run_opencv(imagesPath, workDirectory=workDirectory, options=options, VISUAL_DEBUG=False)
     #run_opencv(imagesPath, options=options) # to test temp directory
