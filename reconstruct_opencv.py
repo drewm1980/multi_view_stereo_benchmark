@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Code for performing reconstruction using openCV
+# Code for performing reconstruction using openCV 3 through opencv's python bindings.
 
 import numpy
 import pathlib
@@ -12,14 +12,10 @@ from load_ply import save_ply_file
 import os
 import inspect
 pwd = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
-#openCVPath = Path(pwd) / 'extern/CMVS-PMVS/program/main/openCV'
-#assert openCVPath.is_file(), "openCV binary not found. Try running bootstrap.sh?"
 
 from load_camera_info import load_intrinsics, load_extrinsics
 
 import cv2
-#cv2.startWindowThread()
-#cv2.destroyAllWindows()
 
 # OpenCV has several stereo matchers with incompatible options lists.
 # I will define a different options class for each type of options,
@@ -91,9 +87,6 @@ class StereoSGBMOptions():
             self.minDisparity = minDisparity
         if numDisparities is None:
             maxDisparity = 7*16 # Seems to affect nearest reconstructable pixel. Set larger to enable closer pixels.
-            #self.numDisparities = 16*60 # 960
-            #self.numDisparities = 16*11 # 176
-            #self.numDisparities = 16*5 # 176
             self.numDisparities = maxDisparity - self.minDisparity
             self.numDisparities -= self.numDisparities%16
         else:
@@ -213,29 +206,25 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
     threedeeimages = []
     # Run OpenCV on the pairs of images
     t1 = time()
-    #for right_index,left_index in topologies[options.topology]: # doesn't work
     for left_index,right_index in topologies[options.topology]:
         left_image, right_image = images[left_index], images[right_index]
         left_camera_matrix, left_R, left_T = all_camera_parameters[left_index]
         right_camera_matrix, right_R, right_T = all_camera_parameters[right_index]
 
+        # TODO: use pyrDown to support downsampling the images by factors of two?
+
         # Perform rectification; this is shared by OpenCV's algorithms
         flags=0
         #flags=cv2.CALIB_ZERO_DISPARITY
         h, w = left_image.shape
-        #print('h =',h,'w =',w)
         dist_coefs = (0.0,0.0,0.0,0.0,0.0)
         imageSize = (w, h)
         if options.newImageSize == (0,0):
             options.newImageSize = imageSize
 
-        # For x1 = left_R*x0+left_T interpretation
+        # Form the transformation between the two camera frames, needed for stereoRectify.
         R = numpy.dot(right_R, left_R.T)
         T = right_T - numpy.dot(R, left_T)
-
-        # For x0 = left_R*x1+left_T interpretation
-        #R = numpy.dot(left_R.T,right_R)
-        #T = numpy.dot(left_R.T,right_T-left_T)
 
         left_R_rectified, right_R_rectified, P1_rect, P2_rect, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(
             cameraMatrix1 = left_camera_matrix,
@@ -251,7 +240,6 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
 
         # Create rectification maps
         rectification_map_type = cv2.CV_16SC2 
-        #rectification_map_type = cv2.CV_32F 
         left_maps = cv2.initUndistortRectifyMap(left_camera_matrix,
                                                 dist_coefs,
                                                 left_R_rectified,
@@ -334,23 +322,12 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
         xyz_filtered = xyz[goodz,:]
         print('pixels before filtering: ',h*w, "after filtering:" ,xyz_filtered.shape[0] )
 
-        # If perspective is from left image:
-        R,T = left_R, left_T
-        #R,T = right_R, right_T
-        #R,T = left_R_rectified, left_T  # nope
-        #R,T = left_R_rectified*left_R, left_T  # nope
-        #R,T = right_R_rectified, right_T 
+        R,T = left_R, left_T # perspective is from left image:
 
         xyz_filtered = numpy.dot(xyz_filtered, left_R_rectified) # NO IDEA WHY THIS IS NECESSARY! WTF?
 
         R,T = R.T,numpy.dot(-R.T,T) # Invert direction of transformation to map camera to world. correct
         
-        #xyz_global = xyz_filtered
-
-        xyz_filtered[0,:] = 0.0 # Debug: should make the camera centers visible.
-        xyz_filtered[1,:] = [0,0,0.005] # Debug: should make the camera direction visible
-        xyz_filtered[2,:] = [0,0,0.03] # Debug: should make the camera direction visible.
-
         xyz_global = numpy.dot(xyz_filtered, R.T) + T.T # Transposing because of right multiply
         save_ply_file(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
 
