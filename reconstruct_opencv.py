@@ -102,7 +102,7 @@ class StereoSGBMOptions():
         self.mode = mode
 
 # Some hard-coded options, roughly slow to fast
-opencvOptionsDict = {'sgbm_defaults': StereoSGBMOptions(channels=1), 'bm_defaults':StereoBMOptions(channels=1)}
+opencvOptionsDict = {'sgbm_defaults': StereoSGBMOptions(), 'bm_defaults':StereoBMOptions()}
 opencvOptionNames = opencvOptionsDict.keys()
 
 # Reasonable stereo matching topologies for a 12 camera ring. Note, there is an additional choice of whether to match in both directions. 
@@ -129,7 +129,10 @@ class OpenCVStereoMatcher():
             matcher_options=[opencvOptionsDict['bm_defaults'],],
             num_cameras=12,
             calibrationsPath=None,
-            topology='overlapping',
+            #topology='overlapping',
+            topology='adjacent',
+            #topology='skipping_1',
+            #topology='skipping_2',
             rectification_interpolation=cv2.INTER_LINEAR,
             visual_debug=False,
             ):
@@ -359,7 +362,7 @@ class OpenCVStereoMatcher():
             R_left_rectified_to_global, T_left_rectified_to_global = self.extrinsics_left_rectified_to_global_array[pair_index]
             xyz_global = numpy.dot(xyz_filtered, R_left_rectified_to_global.T) + T_left_rectified_to_global.T  # TODO: combine this with the the multipilication by Q inside of reprojectImageTo3D above. Note that different filtering may be required.
 
-            #save_ply_file(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
+            #save_ply(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
             xyz_global_array.append(xyz_global)
 
         xyz = numpy.vstack(xyz_global_array)
@@ -415,7 +418,7 @@ class OpenCVStereoMatcher():
             destPath = destDir / destFile
 
         print('Saving reconstruction to',destPath,'...')
-        save_ply_file(xyz, destPath)
+        save_ply(xyz, destPath)
 
         if runtimeFile is None:
             runtimeFile = destPath.parent / (destPath.stem +'_runtime.txt')
