@@ -25,84 +25,48 @@ import cv2
 # and use the type of the passed options structure to switch between
 # stereo matchers.
 
-class StereoBMOptions():
-    def __init__(self,
-            channels=1,
-            alpha = 0.5, # Scaling parameter
-            newImageSize = (0,0),
-            preset = None,
-            numDisparities = 320,
-            blockSize=21,
-            ):
-        assert alpha>=0.0 and alpha <= 1.0, 'Alpha must be in the range [0.0,1.0]'
-        self.alpha = alpha
-        self.channels = channels
-        self.newImageSize = newImageSize
-        if preset is None:
-            #preset = cv2.STEREO_BM_NARROW_PRESET,
-            self.preset = None
-        else:
-            self.preset = preset
-        self.numDisparities = numDisparities
-        self.blockSize = blockSize
-        assert channels is not None, 'StereoSGBMOptions need to know how many channels there are!'
+# Taken from the canonical exported API definition in calib3d.hpp from Opencv 3.2.0 in 
+# nix: /nix/store/6x2783a5k8p75d1klspqqn6dwlg1j8mb-opencv-3.2.0-src/modules/calib3d/include/opencv2
+StereoRectifyOptions = {'imageSize':(1280,1024),
+                        'flags':(0,cv2.CALIB_ZERO_DISPARITY)[0], # TODO explore other flags
+                        'newImageSize':(1280,1024),
+                        'alpha':0.5}
+StereoMatcherOptions = {'MinDisparity': 10,
+                        'NumDisparities': 320,
+                        'BlockSize': 21,
+                        'SpeckleWindowSize': 0,
+                        'SpeckleRange': 0,
+                        'Disp12MaxDiff': 0}
+StereoBMOptions = {
+        'PreFilterType': (cv2.StereoBM_PREFILTER_NORMALIZED_RESPONSE, cv2.StereoBM_PREFILTER_XSOBEL)[0],
+                   'PreFilterSize': 5, # preFilterSize must be odd and be within 5..255
+                   'PreFilterCap': 63, # preFilterCap must be within 1..63. Used to truncate pixel values
+                   'TextureThreshold': 10,
+                   'UniquenessRatio': 10,
+                   'SmallerBlockSize': 16 * 5,
+                   #'ROI1', # I don't really want to set these
+                   #'ROI2'
+                   }
+StereoSGBMOptions = {'PreFilterCap': 0,
+                     'UniquenessRatio': 0,
+                     'P1': 10,
+                     'P2': 10,
+                     'Mode': (cv2.StereoSGBM_MODE_SGBM, cv2.StereoSGBM_MODE_HH,
+                              cv2.StereoSGBM_MODE_SGBM_3WAY)[0]}
+RemapOptions = {'interpolation':cv2.INTER_LINEAR}
+CameraArrayOptions = {
+                        'channels':1,
+                        'num_cameras':12,
+                        'topology':'adjacent'}
 
-    def __hash__(self):
-        fields = list(self.__dict__.items())
-        fields.sort()
-        return hash(tuple(fields)) # 
-
-class StereoSGBMOptions():
-    def __init__(self,
-            channels=1,
-            alpha = 0.5, # Scaling parameter
-            newImageSize = (0,0),
-            minDisparity = None,
-            numDisparities = None,
-            blockSize = 11, # Must be odd! normally 3..11
-            P1 = None,
-            P2 = None,
-            disp12MaxDiff=-1, # <0 to disable left-right check. Bigger to allow more left/right inconsistency
-            preFilterCap=64, # Smaller is stricter?
-            uniquenessRatio=10, # Percent. Normally between 5-15. Seems to work [0,30] Set Bigger to throw out more pixels
-            speckleWindowSize=000, # 0 to disable speckle filtering
-            speckleRange=32, # disparity within component / 16. Normally 1 or 2
-            mode = (cv2.StereoSGBM_MODE_SGBM, cv2.StereoSGBM_MODE_HH, cv2.StereoSGBM_MODE_SGBM_3WAY)[0]
-            ):
-        self.newImageSize = newImageSize
-        if minDisparity is None:
-            self.minDisparity = 0*16 # Affects farthest pixel. Set smaller to enable farther.
-        else:
-            self.minDisparity = minDisparity
-        if numDisparities is None:
-            maxDisparity = 7*16 # Seems to affect nearest reconstructable pixel. Set larger to enable closer pixels.
-            self.numDisparities = maxDisparity - self.minDisparity
-            self.numDisparities -= self.numDisparities%16
-        else:
-            self.numDisparities = numDisparities
-        assert self.numDisparities%16==0, 'numDisparities must be a multiple of 16!'
-        self.blockSize = blockSize
-        assert self.blockSize % 2 == 1, 'blockSize must be odd!'
-        assert channels is not None, 'StereoSGBMOptions need to know how many channels there are!'
-        self.channels = channels
-        if P1 is None:
-            self.P1 = 4*channels*blockSize**2
-        else:
-            self.P1 = P1
-        if P2 is None:
-            self.P2 = 16*channels*blockSize**2
-        else:
-            self.P2 = P2
-        assert self.P2>self.P1, 'Smoothness Parameters must satisfy P2>P1!'
-        self.disp12MaxDiff=disp12MaxDiff
-        self.preFilterCap=preFilterCap
-        self.uniquenessRatio=uniquenessRatio
-        self.speckleWindowSize=speckleWindowSize
-        self.speckleRange=speckleRange
-        self.mode = mode
+DefaultOptionsBM = {'StereoRectify':StereoRectifyOptions,
+        'StereoMatcher':StereoMatcherOptions,
+        'StereoBM':StereoBMOptions,
+        'CameraArray':CameraArrayOptions,
+        'Remap':RemapOptions}
 
 # Some hard-coded options, roughly slow to fast
-opencvOptionsDict = {'sgbm_defaults': StereoSGBMOptions(), 'bm_defaults':StereoBMOptions()}
+opencvOptionsDict = {'opencv_block_matcher_defaults': DefaultOptionsBM}
 opencvOptionNames = opencvOptionsDict.keys()
 
 # Reasonable stereo matching topologies for a 12 camera ring. Note, there is an additional choice of whether to match in both directions. 
@@ -121,33 +85,18 @@ topologies['skipping_2'] = tuple(zip((0,4,8),
 
 class OpenCVStereoMatcher():
     """ Wrapper class that applies OpenCV's stereo matchers pairwise on an array of cameras. 
-        If a list of only one instance is passed in matcher_options, it will be used by all camera pairs.
         Usage: Re-instantiate each time the camera geometry changes with a new calibrationsPath.
             For each reconstruction, call either run_from_memory or run_from_disk depending on your use case.
     """
     def __init__(self,
-            matcher_options=[opencvOptionsDict['bm_defaults'],],
-            num_cameras=12,
+            options=DefaultOptionsBM,
             calibrationsPath=None,
-            #topology='overlapping',
-            topology='adjacent',
-            #topology='skipping_1',
-            #topology='skipping_2',
-            rectification_interpolation=cv2.INTER_LINEAR,
             visual_debug=False,
             ):
-        self.num_cameras = num_cameras
-        self.topology = topology
-        self.rectification_interpolation=rectification_interpolation
+        self.options = options
+        self.num_cameras = options['CameraArray']['num_cameras']
+        self.topology = options['CameraArray']['topology']
         self.visual_debug = visual_debug
-
-        self.num_pairs = len(topologies)
-        if type(matcher_options) is not list:
-            self.matcher_options = [matcher_options]
-        else:
-            self.matcher_options = matcher_options
-        if len(self.matcher_options) == 1:
-            self.matcher_options *= self.num_cameras
 
         assert calibrationsPath is not None, 'To initialize an OpenCVStereoMatcher, you must provide a path to the dirctory containing camera intrinsics and extrinsics!'
         self.load_camera_parameters(calibrationsPath)
@@ -168,16 +117,14 @@ class OpenCVStereoMatcher():
             # TODO: use pyrDown to support downsampling the images by factors of two?
 
             # Perform rectification; this is shared by OpenCV's algorithms
-            flags=0
-            #flags=cv2.CALIB_ZERO_DISPARITY
+            flags=options['StereoRectify']['flags']
 
-            distortion_coefficients = (0.0,0.0,0.0,0.0,0.0)
+            distortion_coefficients = (0.0,0.0,0.0,0.0,0.0) # TODO extend to unrectified images
             left_distortion_coefficients = distortion_coefficients
             right_distortion_coefficients = distortion_coefficients
-            imageSize = (w, h)
-            options = self.matcher_options[pair_index]
-            if options.newImageSize == (0,0):
-                options.newImageSize = imageSize
+            imageSize = options['StereoRectify']['imageSize'] # w,h
+            newImageSize = options['StereoRectify']['newImageSize']
+            alpha = options['StereoRectify']['alpha']
 
             # Form the transformation between the two camera frames, needed for stereoRectify.
             R_intercamera = numpy.dot(right_R, left_R.T)
@@ -189,11 +136,11 @@ class OpenCVStereoMatcher():
                 cameraMatrix2 = right_camera_matrix,
                 distCoeffs2 = right_distortion_coefficients,
                 imageSize=imageSize,
-                newImageSize=options.newImageSize,
+                newImageSize=newImageSize,
                 R=R_intercamera,
                 T=T_intercamera,
                 flags=flags,
-                alpha=options.alpha)
+                alpha=alpha)
 
             self.Q_array.append(Q)
 
@@ -214,33 +161,46 @@ class OpenCVStereoMatcher():
                                                     left_distortion_coefficients,
                                                     left_R_rectified,
                                                     P1_rect,
-                                                    size=options.newImageSize,
+                                                    size=newImageSize,
                                                     m1type=rectification_map_type)
             right_maps = cv2.initUndistortRectifyMap(right_camera_matrix,
                                                      right_distortion_coefficients,
                                                      right_R_rectified,
                                                      P2_rect,
-                                                     size=options.newImageSize,
+                                                     size=newImageSize,
                                                      m1type=rectification_map_type)
             self.left_maps_array.append(left_maps)
             self.right_maps_array.append(right_maps)
 
             # Instantiate the matchers; they may do something slow internally...
-            matching_options = options.__dict__.copy()
-            del matching_options['channels']
-            del matching_options['newImageSize']
-            del matching_options['alpha']
-            if type(options)==StereoSGBMOptions:
-                # Perform stereo matching using SGBM
-                create_matcher = cv2.StereoSGBM_create
-                matcher = create_matcher(**matching_options)
-            elif type(options) == StereoBMOptions:
+            if 'StereoBM' in options:
                 # Perform stereo matching using normal block matching
-                create_matcher = cv2.StereoBM_create
-                del matching_options['preset']
-                matcher = create_matcher(**matching_options)
+                numDisparities = options['StereoMatcher']['NumDisparities']
+                blockSize = options['StereoMatcher']['BlockSize']
+                matcher = cv2.StereoBM_create(numDisparities=numDisparities,blockSize=blockSize)
+                setterOptions = {}
+                setterOptions.update(options['StereoMatcher'])
+                setterOptions.update(options['StereoBM'])
+                for key,value in setterOptions.items():
+                    setter = eval('matcher.set'+key) # Returns the setter function
+                    setter(value) # Calls the setter function.
+            elif 'StereoSGBM' in options:
+                # Perform stereo matching using SGBM
+                minDisparity = options['StereoMatcher']['MinDisparity']
+                numDisparities = options['StereoMatcher']['NumDisparities']
+                blockSize = options['StereoMatcher']['BlockSize']
+                matcher = cv2.StereoSGBM_create(minDisparity=minDisparity,
+                                            numDisparities=numDisparities,
+                                            blockSize=blockSize)
+                setterOptions = {}
+                setterOptions.update(options['StereoMatcher'])
+                setterOptions.update(options['StereoSGBM'])
+                for key,value in setterOptions.items():
+                    setter = eval('matcher.set'+key) # Returns the setter function
+                    setter(value) # Calls the setter function.
+            else:
+                assert False, "Couldn't determine the matcher type from passed options!"
             self.matchers.append(matcher)
-            
 
 
     def load_images(self,imagesPath):
@@ -308,15 +268,16 @@ class OpenCVStereoMatcher():
             print('Performing Stereo matching between cameras', left_index,'and',right_index,'...')
             left_image, right_image = images[left_index], images[right_index]
 
-            
+
             left_maps = self.left_maps_array[pair_index]
             right_maps = self.right_maps_array[pair_index]
 
             # Apply the rectification maps
+            remap_interpolation = self.options['Remap']['interpolation']
             left_image_rectified = cv2.remap(left_image, left_maps[0],
-                                             left_maps[1], self.rectification_interpolation)
+                                             left_maps[1], remap_interpolation)
             right_image_rectified = cv2.remap(right_image, right_maps[0],
-                                              right_maps[1], self.rectification_interpolation)
+                                              right_maps[1], remap_interpolation)
 
             #if self.visual_debug:
             #left = numpy.array(left_image_rectified)
@@ -368,7 +329,7 @@ class OpenCVStereoMatcher():
         xyz = numpy.vstack(xyz_global_array)
         t2 = time()
         dt = t2-t1 # seconds. 
-        
+
         return xyz, dt
 
     def run_from_disk(self,
@@ -376,7 +337,7 @@ class OpenCVStereoMatcher():
                       calibrationsPath=None,
                       destDir=None,
                       destFile=None,
-                      options = opencvOptionsDict['bm_defaults'],
+                      options = opencvOptionsDict['opencv_block_matcher_defaults'],
                       workDirectory=None,
                       runtimeFile=None):
         """ Run OpenCV's stereo matcher on a directory full of images.
@@ -428,7 +389,7 @@ class OpenCVStereoMatcher():
 
 def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None, visual_debug=False):
     """ An inefficent, but simple interface that doesn't precompute anything, and loads from disk. """
-    matcher = OpenCVStereoMatcher(matcher_options=options, calibrationsPath=imagesPath, visual_debug=visual_debug)
+    matcher = OpenCVStereoMatcher(options=options, calibrationsPath=imagesPath, visual_debug=visual_debug)
     matcher.run_from_disk(imagesPath=imagesPath,
                           destDir=destDir,
                           destFile=destFile,
@@ -440,7 +401,6 @@ if __name__=='__main__':
     print('Attempting to run a reconstruction using opencv')
     imagesPath = Path('data/undistorted_images/2016_10_24__17_43_02')
     workDirectory=Path('working_directory_opencv')
-    #options = opencvOptionsDict['sgbm_defaults'] # Still generating ludicrously large cloud. filtering broken.
-    options = opencvOptionsDict['bm_defaults']
+    options = DefaultOptionsBM
     run_opencv(imagesPath=imagesPath, workDirectory=workDirectory, options=options, visual_debug=False)
     #run_opencv(imagesPath, options=options) # to test temp directory
