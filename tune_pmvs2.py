@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 #! Code for tuning the performance of pmvs2
 
-#!/usr/bin/env python3
-
 import numpy
 import functools
 import pathlib
@@ -17,18 +15,18 @@ from reconstruct_pmvs2 import PMVS2Options, run_pmvs
 from benchmark import compare_clouds_and_load_runtime, stats_to_objective
 
 # Define our search space
-grid=cartesian_product((sequence([12],'numCameras'),
-        sequence([0,1,2],'level'),
-        sequence([2,4,8],'csize'),
-        sequence([0.3, 0.5, 0.6, 0.7, 0.8],'threshold'),
-        sequence([7],'wsize'),
-        sequence([2,3],'minImageNum'),
-        sequence([1,2,3,4,5,6,7,8,9,],'CPU'),
-        sequence([1],'useVisData'),
-        sequence([-1],'sequence'),
-        sequence([None],'timages'),
-        sequence([0],'oimages'),
-        sequence([1,2,3],'numNeighbors')
+grid=cartesian_product((sequence('numCameras',[12]),
+        sequence('level',[0,1,2]),
+        sequence('csize',[2,4,8]),
+        sequence('threshold',[0.3, 0.5, 0.6, 0.7, 0.8]),
+        sequence('wsize',[7]),
+        sequence('minImageNum',[2,3]),
+        sequence('CPU',[1,2,3,4,5,6,7,8,9,]),
+        sequence('useVisData',[1]),
+        sequence('sequence',[-1]),
+        sequence('timages',[None]),
+        sequence('oimages',[0]),
+        sequence('numNeighbors',[1,2,3]),
         ))
 
 parameterNames = grid.name.split(',')
@@ -101,38 +99,38 @@ def f(parametersTuple):
 
 seed = (12, 2, 8, 0.8, 7, 3, 7, 1, -1, None, 0, 2)
 
-grid=strong_product((sequence([12],'numCameras'),
-        sequence([0,1,2],'level'),
-        sequence([2,4,8],'csize'),
-        sequence([0.3, 0.5, 0.6, 0.7, 0.8],'threshold'),
-        sequence([7],'wsize'),
-        sequence([2,3],'minImageNum'),
-        sequence([1,2,3,4,5,6,7,8,9,],'CPU'),
-        sequence([1],'useVisData'),
-        sequence([-1],'sequence'),
-        sequence([None],'timages'),
-        sequence([0],'oimages'),
-        sequence([1,2,3],'numNeighbors')
+grid=strong_product((sequence('numCameras',[12]),
+        sequence('level',[0,1,2]),
+        sequence('csize',[2,4,8]),
+        sequence('threshold',[0.3, 0.5, 0.6, 0.7, 0.8]),
+        sequence('wsize',[7]),
+        sequence('minImageNum',[2,3]),
+        sequence('CPU',[1,2,3,4,5,6,7,8,9,]),
+        sequence('useVisData',[1]),
+        sequence('sequence',[-1]),
+        sequence('timages',[None]),
+        sequence('oimages',[0]),
+        sequence('numNeighbors',[1,2,3]),
         ))
 seed = greedy_neighbor_descent(grid, f, seed=seed)
 #(12, 2, 8, 0.8, 7, 3, 8, 1, -1, None, 0, 3) -> 0.52
 
-grid=strong_product((sequence([12],'numCameras'),
-        sequence([2,3],'level'),
-        sequence([4,5,6,7,8,10,12],'csize'),
-        sequence([0.4, 0.5, 0.55, 0.6, 0.65 ],'threshold'),
-        sequence([6,7,8,9,10,11],'wsize'),
-        sequence([2,3,4],'minImageNum'),
-        sequence([7,8],'CPU'),
-        sequence([1],'useVisData'),
-        sequence([-1],'sequence'),
-        sequence([None],'timages'),
-        sequence([0],'oimages'),
-        sequence([2,3],'numNeighbors')
+grid=strong_product((sequence('numCameras',[12]),
+        sequence('level',[2,3]),
+        sequence('csize',[4,5,6,7,8,10,12]),
+        sequence('threshold',[0.4, 0.5, 0.55, 0.6, 0.65 ]),
+        sequence('wsize',[6,7,8,9,10,11]),
+        sequence('minImageNum',[2,3,4]),
+        sequence('CPU',[7,8]),
+        sequence('useVisData',[1]),
+        sequence('sequence',[-1]),
+        sequence('timages',[None]),
+        sequence('oimages',[0]),
+        sequence('numNeighbors',[2,3]),
         ))
 seed = greedy_neighbor_descent(grid, f, seed=seed)
 #(12, 3, 5, 0.6, 6, 3, 7, 1, -1, None, 0, 2)  ->  0.420616645319
-(12, 3, 5, 0.6, 6, 3, 7, 1, -1, None, 0, 2)  ->  0.420616645319
+#(12, 3, 5, 0.6, 6, 3, 7, 1, -1, None, 0, 2)  ->  0.420616645319
 print(seed,' -> ',f(seed))
 
 #tunedOptions = PMVS2Options(**dict(zip(parameterNames,seed)))

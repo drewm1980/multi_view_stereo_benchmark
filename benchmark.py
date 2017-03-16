@@ -10,7 +10,6 @@ import pandas
 
 from compare_clouds import compare_clouds
 from load_ply import load_ply
-from reconstruct import optionNames
 
 def to_datetime(scanID):
     ''' Convert my string timestamps to numpy timestamps '''
@@ -59,6 +58,7 @@ if __name__=='__main__':
 
     # Do all of our cloud comparisons, aggregating the data in a list of dicts
     rawStats = []
+    from reconstruct import optionNames
     for key in optionNames:
         print('Runing benchmark for algorithm key', key)
         for path in Path('./data/reconstructions').iterdir():

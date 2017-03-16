@@ -65,6 +65,40 @@ DefaultOptionsBM = {'StereoRectify':StereoRectifyOptions,
         'CameraArray':CameraArrayOptions,
         'Remap':RemapOptions}
 
+
+def nested_dict_to_list_of_tuples(d, separator='.', extra_nesting=False):
+    """ Take a 2-level nested dict of dict to list of tuples.
+        to preserve some structure, the keys from the two levels are 
+        joined with the separator string.
+        If extra_nesting is true, the inner items are wrapped in an extra
+        tuple. 
+        This function is mainly to support use with my black box tuning code,
+        which represents the search space as key-tuple(value) pairs."""
+    l = []
+    for outer_key, outer_value in d.items():
+        assert separator not in outer_key, 'Please try another separator!'
+        for inner_key, inner_value in outer_value.items():
+            assert separator not in inner_key, 'Please try another separator!'
+            if extra_nesting:
+                inner_value = [inner_value]
+            l.append((outer_key + separator + inner_key, inner_value))
+    return l
+_search_space = nested_dict_to_list_of_tuples(DefaultOptionsBM, extra_nesting=True)
+
+
+def unmangle_tuples_to_nested_dict(l, separator='.'):
+    """ Inverse of the nested_dict_to_list_of_tuples function, assuming there
+        were no name collisions in the name mangling, and no extra_nesting. """
+    d = {}
+    for outer_inner_key, inner_value in l:
+        outer_key, inner_key = outer_inner_key.split(separator)
+        if outer_key not in d:
+            d[outer_key] = {}
+        assert inner_key not in d[outer_key], 'Name collision!'
+        d[outer_key][inner_key] = inner_value
+    return d
+
+
 # Some hard-coded options, roughly slow to fast
 opencvOptionsDict = {'opencv_block_matcher_defaults': DefaultOptionsBM}
 opencvOptionNames = opencvOptionsDict.keys()
