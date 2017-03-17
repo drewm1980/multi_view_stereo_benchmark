@@ -7,16 +7,12 @@ import pathlib
 from pathlib import Path
 from time import time
 
-import shutil
-import glob
-
-from load_ply import save_ply
-
 import os
 import inspect
 pwd = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
 
-from load_camera_info import load_intrinsics, load_extrinsics
+from .load_ply import save_ply
+from .load_camera_info import load_intrinsics, load_extrinsics
 
 import cv2
 
@@ -34,8 +30,8 @@ StereoRectifyOptions = {'imageSize':(1280,1024),
 StereoMatcherOptions = {'MinDisparity': 10,
                         'NumDisparities': 320,
                         'BlockSize': 21,
-                        'SpeckleWindowSize': 0,
-                        'SpeckleRange': 0,
+                        'SpeckleWindowSize': 0, # Must be strictly positive to turn on speckle post-filter.
+                        'SpeckleRange': 0, # Must be >= 0 to enable speckle post-filter
                         'Disp12MaxDiff': 0}
 StereoBMOptions = {
         'PreFilterType': (cv2.StereoBM_PREFILTER_NORMALIZED_RESPONSE, cv2.StereoBM_PREFILTER_XSOBEL)[0],
@@ -43,7 +39,7 @@ StereoBMOptions = {
                    'PreFilterCap': 63, # preFilterCap must be within 1..63. Used to truncate pixel values
                    'TextureThreshold': 10,
                    'UniquenessRatio': 10,
-                   'SmallerBlockSize': 16 * 5,
+                   #'SmallerBlockSize': 16 * 5, # Dead code in opencv!
                    #'ROI1', # I don't really want to set these
                    #'ROI2'
                    }
@@ -65,42 +61,31 @@ DefaultOptionsBM = {'StereoRectify':StereoRectifyOptions,
         'CameraArray':CameraArrayOptions,
         'Remap':RemapOptions}
 
-
-def nested_dict_to_list_of_tuples(d, separator='.', extra_nesting=False):
-    """ Take a 2-level nested dict of dict to list of tuples.
-        to preserve some structure, the keys from the two levels are 
-        joined with the separator string.
-        If extra_nesting is true, the inner items are wrapped in an extra
-        tuple. 
-        This function is mainly to support use with my black box tuning code,
-        which represents the search space as key-tuple(value) pairs."""
-    l = []
-    for outer_key, outer_value in d.items():
-        assert separator not in outer_key, 'Please try another separator!'
-        for inner_key, inner_value in outer_value.items():
-            assert separator not in inner_key, 'Please try another separator!'
-            if extra_nesting:
-                inner_value = [inner_value]
-            l.append((outer_key + separator + inner_key, inner_value))
-    return l
-_search_space = nested_dict_to_list_of_tuples(DefaultOptionsBM, extra_nesting=True)
-
-
-def unmangle_tuples_to_nested_dict(l, separator='.'):
-    """ Inverse of the nested_dict_to_list_of_tuples function, assuming there
-        were no name collisions in the name mangling, and no extra_nesting. """
-    d = {}
-    for outer_inner_key, inner_value in l:
-        outer_key, inner_key = outer_inner_key.split(separator)
-        if outer_key not in d:
-            d[outer_key] = {}
-        assert inner_key not in d[outer_key], 'Name collision!'
-        d[outer_key][inner_key] = inner_value
-    return d
-
+TunedOptionsBM = {'CameraArray': {'channels': 1,
+                                  'num_cameras': 12,
+                                  'topology': 'skipping_1'},
+                  'Remap': {'interpolation': 1},
+                  'StereoBM': {'PreFilterCap': 63,
+                               'PreFilterSize': 5,
+                               'PreFilterType': 0,
+                               'TextureThreshold': 11,
+                               'UniquenessRatio': 10},
+                  'StereoMatcher': {'BlockSize': 21,
+                                    'Disp12MaxDiff': 0,
+                                    'MinDisparity': 0,
+                                    'NumDisparities': 288,
+                                    'SpeckleRange': 0,
+                                    'SpeckleWindowSize': 0},
+                  'StereoRectify': {'alpha': 0.5,
+                                    'flags': 0,
+                                    'imageSize': (1280, 1024),
+                                    'newImageSize': (1280, 1024)}}
 
 # Some hard-coded options, roughly slow to fast
-opencvOptionsDict = {'opencv_block_matcher_defaults': DefaultOptionsBM}
+opencvOptionsDict = {
+    #'opencv_block_matcher_defaults': DefaultOptionsBM,
+    'opencv_tuned_block_matcher': TunedOptionsBM,
+}
 opencvOptionNames = opencvOptionsDict.keys()
 
 # Reasonable stereo matching topologies for a 12 camera ring. Note, there is an additional choice of whether to match in both directions. 
@@ -271,7 +256,7 @@ class OpenCVStereoMatcher():
         for i in range(self.num_cameras):
             # Load the intrinsics
             intrinsicsFilePath = calibrationsPath / ('intrinsics_camera%02i.txt' % (i + 1))
-            print('Loading intrinsics for camera',i,'from',intrinsicsFilePath,'...')
+            #print('Loading intrinsics for camera',i,'from',intrinsicsFilePath,'...')
             assert intrinsicsFilePath.is_file(), "Couldn't find camera intrinsics in "+str(intrinsicsFilePath)
             camera_matrix, distortion_coefficients, image_width, image_height = load_intrinsics(intrinsicsFilePath)
             # The images must already be radially undistorted
@@ -283,7 +268,7 @@ class OpenCVStereoMatcher():
 
             # Load the extrinsics
             extrinsicsFilePath = calibrationsPath / ('extrinsics_camera%02i.txt' % (i + 1))
-            print('Loading extrinsics for camera',i,'from',extrinsicsFilePath,'...')
+            #print('Loading extrinsics for camera',i,'from',extrinsicsFilePath,'...')
             R, T = load_extrinsics(extrinsicsFilePath)
 
             # OpenCV expects the inverse of the transform that HALCON exports!
@@ -371,7 +356,7 @@ class OpenCVStereoMatcher():
                       calibrationsPath=None,
                       destDir=None,
                       destFile=None,
-                      options = opencvOptionsDict['opencv_block_matcher_defaults'],
+                      options = None,
                       workDirectory=None,
                       runtimeFile=None):
         """ Run OpenCV's stereo matcher on a directory full of images.
@@ -382,7 +367,7 @@ class OpenCVStereoMatcher():
         imagesPath -- A directory full of source images
         destDir -- The destination directory of the ply file. (default current directory)
         destFile -- The destination name of the ply file. (default <name of the directory>.ply)
-        options -- An instance of OpenCVOptions
+        options -- A nested dict of stereo matcher options as exemplified above.
         workDirectory -- Existing directory where intermediate results may be written for debugging. (default generates a temp directory)
         runtimeFile -- The name of a file where info regarding the runtime will be stored.
         """
@@ -399,7 +384,7 @@ class OpenCVStereoMatcher():
         if workDirectory is None:
             from tempfile import TemporaryDirectory
             workDirectory = TemporaryDirectory(dir=str(Path(pwd)/'tmp'))
-        if not workDirectory.is_dir():
+        if type(workDirectory) is Path and not workDirectory.is_dir():
             workDirectory.mkdir()
 
         xyz, reconstruction_time = self.run_from_memory(self.images)
@@ -410,7 +395,7 @@ class OpenCVStereoMatcher():
             destDir = Path.cwd()
         if destFile is None:
             destFile = 'reconstruction.ply'
-            destPath = destDir / destFile
+        destPath = destDir / destFile
 
         print('Saving reconstruction to',destPath,'...')
         save_ply(xyz, destPath)

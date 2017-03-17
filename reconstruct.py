@@ -6,25 +6,45 @@ import pathlib
 from pathlib import Path
 import numpy
 
-from reconstruct_pmvs2 import set_up_visualize_subdirectory, run_pmvs, pmvsOptionNames, pmvsOptionsDict
+import sys
 
-optionNames = pmvsOptionNames
-destFileNames = {optionName:optionName+'.ply' for optionName in pmvsOptionNames}
+if __name__ == '__main__' and __package__ is None:
+    sys.path.append(Path(__file__).absolute().parent)
+
+allOptionNames = []
+allOptionsDict = {}
+
+# Enable PMVS reconstruction
+from .reconstruct_pmvs2 import run_pmvs, pmvsOptionNames, pmvsOptionsDict
+allOptionNames += pmvsOptionNames
+allOptionsDict.update(pmvsOptionsDict)
+
+# Enable OpenCV reconstruction
+from .reconstruct_opencv import run_opencv, opencvOptionNames, opencvOptionsDict
+allOptionNames += opencvOptionNames
+allOptionsDict.update(opencvOptionsDict)
+
+destFileNames = {optionName:optionName+'.ply' for optionName in allOptionNames}
 
 def generate_missing_reconstructions(imagesPath: Path,
                                      reconstructionsPath: Path=Path('.'),
-                                     optionNames=optionNames,
-                                     optionsDict=pmvsOptionsDict,
+                                     optionNames=allOptionNames,
+                                     optionsDict=allOptionsDict,
                                      destFileNames=destFileNames):
     for optionName in optionNames:
         destFileName = destFileNames[optionName]
         if not (reconstructionsPath / destFileName).is_file():
             print('Running reconstruction configuration: ', optionName)
-            run_pmvs(imagesPath=imagesPath,
+            if 'pmvs' in optionName:
+                run = run_pmvs
+            elif 'opencv' in optionName:
+                run = run_opencv
+            else:
+                assert False, "Couldn't figure out which algorithm to run from the name of the options!"
+            run(imagesPath=imagesPath,
                      destDir=reconstructionsPath,
                      options=optionsDict[optionName],
                      destFile=destFileNames[optionName])
-            # TODO: Extend this to run gipuma and others too...
 
 def do_reconstructions_for_the_benchmark(sourceDir=Path('data/undistorted_images'),
                                          destDir=Path('data/reconstructions')):
