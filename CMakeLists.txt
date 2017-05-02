@@ -35,3 +35,7 @@ target_link_libraries(compare_clouds -lgomp)
 #target_include_directories(compare_clouds_bin PRIVATE ${PCL_INCLUDE_DIRS})
 #target_link_libraries(compare_clouds_bin ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES} ${PCL_SAMPLE_CONSENSUS_LIBRARIES})
 #target_compile_options(compare_clouds_bin PRIVATE -std=c++11 -O3 -Werror -Wall -ffast-math)
+
+add_library(background_subtraction SHARED background_subtraction.cpp)
+target_compile_options(background_subtraction PRIVATE -std=c++11 -O3 -Werror -Wall -ffast-math -fopenmp)
+target_link_libraries(background_subtraction -lgomp)
