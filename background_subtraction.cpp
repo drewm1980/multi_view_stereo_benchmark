@@ -7,59 +7,16 @@ using namespace std;
 
 extern "C" {
 using namespace std;
-void update_histogram(const uint8_t* __restrict__ image, int h, int w,
-                      uint8_t* __restrict__ histogram) {
+void update_histogram_image(const uint8_t* __restrict__ image, int pixels,
+                      uint8_t* __restrict__ histogram_image) {
 #pragma omp parallel for schedule(static)
-    for (int v = 0; v < h; v++) {
-        for (int u = 0; u < w; u++) {
-            int image_index = v * w + u;
-            uint8_t image_value = image[image_index];
-            int histogram_bin = image_index * 256 + image_value;
-            if (histogram[histogram_bin] < 255) histogram[histogram_bin] += 1;
-        }
+    for(int pixel_index = 0; pixel_index<pixels; pixel_index++){
+      uint8_t image_value = image[pixel_index];
+      int histogram_bin = pixel_index * 256 + image_value; // linear index into the histogram image
+      int old_histogram_value = histogram_image[histogram_bin];
+      if (old_histogram_value == 255) continue; // Saturate instead of wrapping.
+      histogram_image[histogram_bin] = old_histogram_value + 1;
     }
-}
-
-void median_of_histogram_image(const uint8_t * __restrict__ histogram, uint8_t * __restrict__ median, int pixels, uint8_t samples)
-{
-  // Take an image that has a 256 bin histogram at each pixel, and return an
-  // image containing the median value at each pixel, rounded down.
-  //
-  // STATUS: THIS HAS BUGS!!! REFER TO THE PYTHON IMPLEMENTATION FOR NOW!
-#pragma omp parallel for schedule(static)
-    for(int pixel_index = 0; pixel_index<pixels; pixel_index++)
-  {
-    const uint8_t * hist = histogram + pixel_index*256;
-
-    int sum = samples;
-    int sum_left = 0;
-    int sum_right = sum;
-    
-    // Explicitly handle edge cases
-    if(hist[0]*2>sum) median[pixel_index] = 0;
-    if(hist[255]*2>sum) median[pixel_index] = 255;
-
-    // Handle the middle cases
-    sum_right -= hist[0];
-    int current_plateau_width = 0;
-    int last_difference = sum;
-    for(int i=1; i<256; i++)
-    {
-      sum_left += hist[i-1];
-      sum_right -= hist[i];
-      if (hist[i]==0)
-      {
-        current_plateau_width += 1;
-        continue;
-      }
-      int difference = abs(sum_right - sum_left);
-      if (difference > last_difference)
-      {
-        median[pixel_index] = i-current_plateau_width/2; // Implements averaging
-      }
-      current_plateau_width = 0;
-    }
-  }
 }
 
 // Take a pointer to a 256 bin histogram of uint8 type, and return the median.
@@ -67,6 +24,8 @@ uint8_t histogram_to_median(const uint8_t* hist)
 {
   // This requires an extra pass through the data, but the next pass will be
   // cached anyway so it probably doesn't make a difference.
+  // Provides more gracefull degredation for histograms that may have saturated in
+  // some bins.
   int samples=0; // The number of samples.
   for (int i = 0; i < 256; i++) samples += hist[i];
     
@@ -106,6 +65,18 @@ uint8_t histogram_to_median(const uint8_t* hist)
   return median;
 
 }
+
+void median_of_histogram_image(const uint8_t * __restrict__ histogram_image, uint8_t * __restrict__ median_image, int pixels)
+{
+  // Take an image that has a 256 bin histogram at each pixel, and return an
+  // image containing the median value at each pixel, rounded down.
+#pragma omp parallel for schedule(static)
+  for (int pixel_index = 0; pixel_index < pixels; pixel_index++) {
+      const uint8_t* histogram = histogram_image + pixel_index * 256;
+      median_image[pixel_index] = histogram_to_median(histogram);
+  }
+}
+
 
 void absdiff_uint8(const uint8_t* __restrict__ left,
                    const uint8_t* __restrict__ right,

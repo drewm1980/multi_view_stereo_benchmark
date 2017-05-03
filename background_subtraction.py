@@ -57,11 +57,53 @@ try:
     from ctypes import c_int32 as int32
     libbackground_subtraction = numpy.ctypeslib.load_library('libbackground_subtraction','.')
     image_type = ndpointer(dtype=numpy.uint8,ndim=2,flags='CONTIGUOUS,ALIGNED')
-    histogram_type = ndpointer(dtype=numpy.uint8,ndim=3,flags='CONTIGUOUS,ALIGNED')
+    histogram_image_type = ndpointer(dtype=numpy.uint8,ndim=3,flags='CONTIGUOUS,ALIGNED')
     libbackground_subtraction.histogram_to_median.argtypes = (ndpointer(dtype=numpy.uint8,ndim=1,flags='CONTIGUOUS,ALIGNED'),)
     libbackground_subtraction.histogram_to_median.restype = numpy.uint8
     histogram_to_median_c = libbackground_subtraction.histogram_to_median
     histogram_to_median = histogram_to_median_c
+
+    libbackground_subtraction.update_histogram_image.argtypes = (image_type, histogram_image_type, int32)
+    def update_histogram_image(image, histogram_image):
+        '''Take a histogram image stored as a h x w x 256 uint8 numpy array,
+        and increment the values in-place with the values in the passed image.
+        I couldn't find a way to do this efficiently with numpy indexing,
+        thus the trivial C extension.'''
+        rows,columns,bins = histogram_image.shape
+        pixels = rows*columns
+        assert bins==256
+        libbackground_subtraction.update_histogram_image(image, histogram_image, pixels)
+
+    libbackground_subtraction.median_of_histogram_image.argtypes = (histogram_image_type, image_type, int32)
+    def median_of_histogram_image(histogram_image):
+        rows,columns,bins = histogram_image.shape
+        pixels = rows*columns
+        assert bins==256
+        median_image = numpy.empty((rows,columns),dtype=numpy.uint8)
+        libbackground_subtraction.median_of_histogram_image(histogram_image, median_image, pixels)
+        return median_image
+
+    def pixelwise_median(images):
+        ''' Compute the pixelwise median of a set of images.
+            input is an iterable of images. Danger of saturation if run on more than 256 images!'''
+        histogram_image = None
+        expected_shape = None
+        for image in images:
+            assert image.dtype==numpy.uint8
+            assert len(image.shape)==2, "Only monochrome images are currently supported!"
+            # Note: trivial extension to color is possible by doing each channel separately, but
+            #       this wouldn't always a good robust estimator within a 3D colorspace, so color abberations
+            #       would probably occur at some pixels. 
+            h,w = image.shape
+            if not expected_shape:
+                expected_shape = image.shape
+            assert image.shape == expected_shape, 'Images must all be the same size!'
+            assert image.dtype == numpy.uint8, 'Images must be type uint8!'
+            if not histogram_image:
+                histogram_image = numpy.zeros((h,w,256),dtype=numpy.uint8)
+            update_histogram_image(image,histogram_image)
+        return median_of_histogram_image(histogram_image)
+            
 except:
     print('Could not load C extension for histogram_to_median. Will default to python implementation!')
     histogram_to_median = histogram_to_median_python
@@ -133,13 +175,17 @@ def test_histogram_to_median_python_and_c_equivalence():
         assert median_c == median_python
     print('test_histogram_to_median_python_and_c_equivalence: PASSED!')
 
-def update_histogram(image, histogram):
-    # Take a histogram image stored as a h x w x 256 uint8 numpy array,
-    # and increment the values in-place with the values in the passed image.
-    # I couldn't find a way to do this efficiently with numpy indexing,
-    # thus the trivial C extension.
-    pass
+def test_pixelwise_median():
+    h = 10
+    w = 10
+    noise = numpy.random.randint(low=0,high=10,size=(h,w),dtype=numpy.uint8)
+    signal = numpy.random.randint(low=0,high=255,size=(h,w),dtype=numpy.uint8)
+    images = 2*(signal,)+(signal+noise,) # One noisy image shouldn't throw off the median
+    median_image = pixelwise_median(images)
+    assert numpy.all(median_image==signal), 'Median failed to recover noiseless image in test_pixelwise_median!'
+    print('test_pixelwise_median: PASSED')
 
 if __name__=='__main__':
     test_histogram_to_median()
     test_histogram_to_median_python_and_c_equivalence()
+    test_pixelwise_median()
