@@ -2,18 +2,11 @@
 
 # Code for background modeling, subtraction, etc...
 
-from ctypes import c_float as float32
-from ctypes import c_int32 as int32
 import numpy
-from numpy.ctypeslib import ndpointer
-
-#libbackground_subtraction = numpy.ctypeslib.load_library('libbackground_subtraction','.')
-#image_type = ndpointer(dtype=numpy.uint8,ndim=2,flags='CONTIGUOUS,ALIGNED')
-#histogram_type = ndpointer(dtype=numpy.uint8,ndim=3,flags='CONTIGUOUS,ALIGNED')
-#libbackground_subtraction.argtypes
 
 
-def histogram_to_median(hist, expected_median=None):
+def histogram_to_median_python(hist, expected_median=None):
+    assert len(hist)==256, "histogram_to_median_python only works on arrays of length 256"
     samples = numpy.sum(hist)
     
     # Explicitly handle edge cases
@@ -53,10 +46,26 @@ def histogram_to_median(hist, expected_median=None):
             print('expected_median=',expected_median)
             assert False
     
-    return 
+    return median
         #print('i',i,'sum_left',sum_left, 'sum_right',sum_right)
     # Followed a sequence of zeros to the end.
     #assert False
+
+try:
+    from numpy.ctypeslib import ndpointer
+    from ctypes import c_float as float32
+    from ctypes import c_int32 as int32
+    libbackground_subtraction = numpy.ctypeslib.load_library('libbackground_subtraction','.')
+    image_type = ndpointer(dtype=numpy.uint8,ndim=2,flags='CONTIGUOUS,ALIGNED')
+    histogram_type = ndpointer(dtype=numpy.uint8,ndim=3,flags='CONTIGUOUS,ALIGNED')
+    libbackground_subtraction.histogram_to_median.argtypes = (ndpointer(dtype=numpy.uint8,ndim=1,flags='CONTIGUOUS,ALIGNED'),)
+    libbackground_subtraction.histogram_to_median.restype = numpy.uint8
+    histogram_to_median_c = libbackground_subtraction.histogram_to_median
+    histogram_to_median = histogram_to_median_c
+except:
+    print('Could not load C extension for histogram_to_median. Will default to python implementation!')
+    histogram_to_median = histogram_to_median_python
+
 
 # Tuples containing hist as a tuple, and expected median. If smaller than 256 entries, will be zero padded.
 histogram_to_median_test_cases = (
@@ -93,16 +102,36 @@ histogram_to_median_test_cases = (
         ((2,0,0,0,0,2),2),
         ((2,0,0,0,0,0,2),3),
         ((0,1,0,1,0,1,0),3),
+        # Check edge cases at the end of a big array
+        (255*(0,)+(1,),255),
+        (255*(1,)+(2,),128),
+        # Same but for a less special sized array
+        (55*(0,)+(1,),55),
+        (55*(1,)+(2,),28),
         )
 
+end_test = (0*numpy.ones(256),127),
 def test_histogram_to_median():
     for hist,expected_median in histogram_to_median_test_cases:
         hist = numpy.array(hist)
-        hist_padded = numpy.zeros(256)
+        hist_padded = numpy.zeros(256,dtype=numpy.uint8)
         hist_padded[0:len(hist)] = hist
-        #assert histogram_to_median(hist_padded) == expected_median
-        print('hist=',hist_padded)
-        histogram_to_median(hist_padded, expected_median)
+        #print('hist=',hist_padded)
+        #histogram_to_median(hist_padded, expected_median)
+        assert histogram_to_median(hist_padded) == expected_median
+    print('test_histogram_to_median: PASSED!')
+
+def test_histogram_to_median_python_and_c_equivalence():
+    for hist,expected_median in histogram_to_median_test_cases:
+        hist = numpy.array(hist)
+        hist_padded = numpy.zeros(256,dtype=numpy.uint8)
+        hist_padded[0:len(hist)] = hist
+        #print('hist=',hist_padded)
+        median_c = histogram_to_median_c(hist_padded, expected_median)
+        median_python = histogram_to_median_python(hist_padded, expected_median)
+        assert median_c == expected_median
+        assert median_c == median_python
+    print('test_histogram_to_median_python_and_c_equivalence: PASSED!')
 
 def update_histogram(image, histogram):
     # Take a histogram image stored as a h x w x 256 uint8 numpy array,
@@ -113,3 +142,4 @@ def update_histogram(image, histogram):
 
 if __name__=='__main__':
     test_histogram_to_median()
+    test_histogram_to_median_python_and_c_equivalence()
