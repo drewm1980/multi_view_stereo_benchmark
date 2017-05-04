@@ -76,6 +76,7 @@ def histogram_to_median_python(hist, expected_median=None):
 
 def pixelwise_median_sort_based_python(images):
     # Implementaton of pixelwise median based on numpy's "partition", comparable to C++'s nth_element.
+    # the actual underlying algorithm is introselect
     print('Stacking the images up in a big array...')
     big_array = numpy.dstack(images)
     num_images = big_array.shape[2]
@@ -142,7 +143,7 @@ try:
         libbackground_subtraction.median_of_histogram_image(histogram_image, median_image, pixels)
         return median_image
 
-    def pixelwise_median(images):
+    def pixelwise_median_histogram_based_c(images):
         ''' Compute the pixelwise median of a set of images.
             input is an iterable of images. Danger of saturation if run on more than 256 images!'''
         histogram_image = None
@@ -246,7 +247,7 @@ def test_pixelwise_median():
     images = 128*(signal,)+127*(signal+noise,) # One noisy image shouldn't throw off the median... OOPs wraparound!
     from time import time
     t1 = time()
-    #median_image = pixelwise_median(images) # Broken C implementation
+    #median_image = pixelwise_median_histogram_based_c(images) # Broken C implementation
     #median_image = pixelwise_median_sort_based_python(images) 
     median_image = pixelwise_median_numpy(images) 
     t2 = time()

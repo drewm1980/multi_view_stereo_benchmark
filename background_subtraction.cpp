@@ -26,6 +26,12 @@ uint8_t histogram_to_median(const uint8_t* hist)
   // cached anyway so it probably doesn't make a difference.
   // Provides more gracefull degredation for histograms that may have saturated in
   // some bins.
+  //
+  // STATUS: BROKEN! There are known broken edge cases that still need to be
+  // sorted out in the python implementation and ported here.
+  //
+  // The motivation for this histogram based median algorithm is to try to be
+  // faster when running on a large number of images. 
   int samples=0; // The number of samples.
   for (int i = 0; i < 256; i++) samples += hist[i];
     
@@ -78,7 +84,6 @@ void median_of_histogram_image(const uint8_t * __restrict__ histogram_image, uin
       median_image[pixel_index] = histogram_to_median(histogram);
   }
 }
-
 
 void absdiff_uint8(const uint8_t* __restrict__ left,
                    const uint8_t* __restrict__ right,
