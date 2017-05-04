@@ -74,6 +74,42 @@ def histogram_to_median_python(hist, expected_median=None):
     # Followed a sequence of zeros to the end.
     #assert False
 
+def pixelwise_median_sort_based_python(images):
+    # Implementaton of pixelwise median based on numpy's "partition", comparable to C++'s nth_element.
+    print('Stacking the images up in a big array...')
+    big_array = numpy.dstack(images)
+    num_images = big_array.shape[2]
+    # A couple trivial cases
+    if len(images)==1:
+        return images[0]
+    if len(images)==2:
+        return (images[0].astype(numpy.int) + images[1].astype(numpy.int))/2
+    if num_images%2==1:
+        # Case of ODD number of images is easier
+        kth=(num_images-1)/2
+        print('Performing partition for the odd case...')
+        big_array.partition(kth, axis=2)
+        print('Extracting the median into a dense array...')
+        return big_array[:,:,kth].copy()
+    else:
+        # Case of EVEN number of images requires some averaging.
+        # numpy's partition is able to get the middle TWO positions
+        # into their sorted order.
+        middle_two=(num_images/2-1,num_images/2)
+        print('Performing partition for the even case...')
+        big_array.partition(kth=middle_two,axis=2)
+        print('Doing averaging and extracting the median into a dense array...')
+        return big_array[:,:,int(middle_two[0]):int(middle_two[0]+2)].mean(axis=2).astype(images[0].dtype) # flooring conversion if images are integer pixel type.
+
+def pixelwise_median_numpy(images):
+    print('Stacking the images up in a big array...') # This is the slow part!
+    big_array = numpy.dstack(images)
+    median_image = numpy.empty_like(images[0])
+    print("Calling numpy's in-place median function...")
+    numpy.median(big_array, axis=2, out=median_image, overwrite_input=True)
+    return median_image
+
+
 try:
     from numpy.ctypeslib import ndpointer
     from ctypes import c_float as float32
@@ -208,7 +244,13 @@ def test_pixelwise_median():
     noise = numpy.random.randint(low=0,high=10,size=(h,w),dtype=numpy.uint8)
     signal = numpy.random.randint(low=0,high=255,size=(h,w),dtype=numpy.uint8)
     images = 128*(signal,)+127*(signal+noise,) # One noisy image shouldn't throw off the median... OOPs wraparound!
-    median_image = pixelwise_median(images)
+    from time import time
+    t1 = time()
+    #median_image = pixelwise_median(images) # Broken C implementation
+    #median_image = pixelwise_median_sort_based_python(images) 
+    median_image = pixelwise_median_numpy(images) 
+    t2 = time()
+    print('Median computation took', t2-t1, ' seconds.')
     if not numpy.all(median_image==signal):
         print('Median failed to recover noiseless image in test_pixelwise_median!')
         failed_pixels = numpy.argwhere(median_image != signal)
@@ -223,6 +265,6 @@ def test_pixelwise_median():
     print('test_pixelwise_median: PASSED')
 
 if __name__=='__main__':
-    test_histogram_to_median_python()
+    #test_histogram_to_median_python()
     #test_histogram_to_median_python_and_c_equivalence()
-    #test_pixelwise_median()
+    test_pixelwise_median()
