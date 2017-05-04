@@ -7,8 +7,8 @@ using namespace std;
 
 extern "C" {
 using namespace std;
-void update_histogram_image(const uint8_t* __restrict__ image, int pixels,
-                      uint8_t* __restrict__ histogram_image) {
+void update_histogram_image(const uint8_t* __restrict__ image,
+                            uint8_t* __restrict__ histogram_image, int pixels) {
 #pragma omp parallel for schedule(static)
     for(int pixel_index = 0; pixel_index<pixels; pixel_index++){
       uint8_t image_value = image[pixel_index];
@@ -57,13 +57,15 @@ uint8_t histogram_to_median(const uint8_t* hist)
           sum_left += hist[i];
           sum_right -= hist[i + 1];
       }
-  }
+  } // for
 
-  // Note: the following implements averaging. Note: should get compiled to a
-  // shift. Rounds down implicitly.
-  uint8_t median = (plateau_end + plateau_start)/2;  
-  return median;
-
+  if (plateau_start == plateau_end) return plateau_start;
+  uint8_t h1 = hist[plateau_start];
+  uint8_t h2 = hist[plateau_end];
+  if (h1 == h2) return (plateau_end + plateau_start)/2; // note: implicit rounding down.
+  if (h1 < h2) return plateau_end;
+  //if (h1 > h2)
+  return plateau_start;
 }
 
 void median_of_histogram_image(const uint8_t * __restrict__ histogram_image, uint8_t * __restrict__ median_image, int pixels)

@@ -6,6 +6,7 @@ import numpy
 
 
 def histogram_to_median_python(hist, expected_median=None):
+    print('histogram=',hist)
     assert len(hist)==256, "histogram_to_median_python only works on arrays of length 256"
     samples = numpy.sum(hist)
     
@@ -37,11 +38,33 @@ def histogram_to_median_python(hist, expected_median=None):
             sum_left += hist[i];
             sum_right -= hist[i+1];
 
-    median = int(numpy.floor((plateau_end+plateau_start)/2)); # Implements averaging
+        # For debug:
+        if plateau_start>0:
+            h1 = hist[plateau_start-1]
+        else:
+            h1 = hist[plateau_start]
+        if plateau_end<255:
+            h2 = hist[plateau_end+1]
+        else:
+            h2 = hist[plateau_end]
+        print('plateau=',(plateau_start, plateau_end, h1, h2))
+
+    if plateau_start == plateau_end:
+        median = plateau_start
+    elif h1==h2:
+        median = int(numpy.floor((plateau_end+plateau_start)/2)); # Implements averaging
+    elif h1 < h2:
+        median = plateau_end
+    else:
+        median = plateau_start
+
+    print('median=',median)
+    print('expected_median=',expected_median)
+
     if expected_median is not None:
         if expected_median != median:
-            print('plateau_start=',plateau_start)
-            print('plateau_end=',plateau_end)
+            #print('plateau_start=',plateau_start)
+            #print('plateau_end=',plateau_end)
             print('median=',median)
             print('expected_median=',expected_median)
             assert False
@@ -95,13 +118,15 @@ try:
             #       this wouldn't always a good robust estimator within a 3D colorspace, so color abberations
             #       would probably occur at some pixels. 
             h,w = image.shape
-            if not expected_shape:
+            if expected_shape is None:
                 expected_shape = image.shape
             assert image.shape == expected_shape, 'Images must all be the same size!'
             assert image.dtype == numpy.uint8, 'Images must be type uint8!'
-            if not histogram_image:
+            if histogram_image is None:
                 histogram_image = numpy.zeros((h,w,256),dtype=numpy.uint8)
             update_histogram_image(image,histogram_image)
+        print(histogram_image[0,0,:])
+        #assert False
         return median_of_histogram_image(histogram_image)
             
 except:
@@ -150,17 +175,18 @@ histogram_to_median_test_cases = (
         # Same but for a less special sized array
         (55*(0,)+(1,),55),
         (55*(1,)+(2,),28),
+        ((0,2,0,1),1), # Reproduce a bug in plateau logic
+        (4*(0,)+(2,)+16*(0,)+(1,),4), # Reproduce a bug in plateau logic
+        (103*(0,)+(128,)+5*(0,)+(127,),104), # Reproduce a bug in plateau logic
         )
 
-end_test = (0*numpy.ones(256),127),
-def test_histogram_to_median():
+def test_histogram_to_median_python():
     for hist,expected_median in histogram_to_median_test_cases:
         hist = numpy.array(hist)
         hist_padded = numpy.zeros(256,dtype=numpy.uint8)
         hist_padded[0:len(hist)] = hist
-        #print('hist=',hist_padded)
-        #histogram_to_median(hist_padded, expected_median)
-        assert histogram_to_median(hist_padded) == expected_median
+        histogram_to_median_python(hist_padded, expected_median) # Better for debugging
+        assert histogram_to_median_python(hist_padded) == expected_median
     print('test_histogram_to_median: PASSED!')
 
 def test_histogram_to_median_python_and_c_equivalence():
@@ -176,16 +202,27 @@ def test_histogram_to_median_python_and_c_equivalence():
     print('test_histogram_to_median_python_and_c_equivalence: PASSED!')
 
 def test_pixelwise_median():
-    h = 10
-    w = 10
+    h = 1024
+    w = 1024
+    numpy.random.seed(10)
     noise = numpy.random.randint(low=0,high=10,size=(h,w),dtype=numpy.uint8)
     signal = numpy.random.randint(low=0,high=255,size=(h,w),dtype=numpy.uint8)
-    images = 2*(signal,)+(signal+noise,) # One noisy image shouldn't throw off the median
+    images = 128*(signal,)+127*(signal+noise,) # One noisy image shouldn't throw off the median... OOPs wraparound!
     median_image = pixelwise_median(images)
-    assert numpy.all(median_image==signal), 'Median failed to recover noiseless image in test_pixelwise_median!'
+    if not numpy.all(median_image==signal):
+        print('Median failed to recover noiseless image in test_pixelwise_median!')
+        failed_pixels = numpy.argwhere(median_image != signal)
+        print('Failed cases:')
+        for pixelx,pixely in failed_pixels:
+            single_pixel_image = tuple([image[pixelx,pixely] for image in images])
+            signal_pixel = signal[pixelx,pixely]
+            noise_pixel = noise[pixelx,pixely]
+            proposed_test_case = (single_pixel_image, signal_pixel)
+            print('proposed_test_case:',proposed_test_case)
+
     print('test_pixelwise_median: PASSED')
 
 if __name__=='__main__':
-    test_histogram_to_median()
-    test_histogram_to_median_python_and_c_equivalence()
-    test_pixelwise_median()
+    test_histogram_to_median_python()
+    #test_histogram_to_median_python_and_c_equivalence()
+    #test_pixelwise_median()
