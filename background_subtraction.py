@@ -115,7 +115,7 @@ try:
     from numpy.ctypeslib import ndpointer
     from ctypes import c_float as float32
     from ctypes import c_int32 as int32
-    libbackground_subtraction = numpy.ctypeslib.load_library('libbackground_subtraction','.')
+    libbackground_subtraction = numpy.ctypeslib.load_library('libbackground_subtraction',__file__)
     image_type = ndpointer(dtype=numpy.uint8,ndim=2,flags='CONTIGUOUS,ALIGNED')
     histogram_image_type = ndpointer(dtype=numpy.uint8,ndim=3,flags='CONTIGUOUS,ALIGNED')
     libbackground_subtraction.histogram_to_median.argtypes = (ndpointer(dtype=numpy.uint8,ndim=1,flags='CONTIGUOUS,ALIGNED'),)

@@ -11,8 +11,8 @@ import os
 import inspect
 pwd = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
 
-from .load_ply import save_ply
-from .load_camera_info import load_intrinsics, load_extrinsics
+from load_ply import save_ply
+from load_camera_info import load_intrinsics, load_extrinsics
 
 import cv2
 
@@ -276,8 +276,11 @@ class OpenCVStereoMatcher():
             all_camera_parameters.append((camera_matrix, R, T, image_width, image_height))
         self.all_camera_parameters = all_camera_parameters
 
-    def run_from_memory(self, images):
-        """ Perform stereo reconstruction on a set of images already in memory, and return results in memory. """
+    def run_from_memory(self, images, background_masks=None):
+        """ Perform stereo reconstruction on a set of images already in memory, and return results in memory. 
+        background_masks: an optional array of binary images where values >0 indicate regions of each image
+        that are certainly in the background.
+        """
         assert self.all_camera_parameters is not None, 'Camera parameters not loaded yet; You should run load_camera_parameters first!'
 
 
@@ -297,6 +300,14 @@ class OpenCVStereoMatcher():
                                              left_maps[1], remap_interpolation)
             right_image_rectified = cv2.remap(right_image, right_maps[0],
                                               right_maps[1], remap_interpolation)
+            if background_masks is not None:
+                left_background_rectified = cv2.remap(
+                    background_masks[left_index], left_maps[0], left_maps[1],
+                    cv2.INTER_NEAREST)
+                #right_background_rectified = cv2.remap(
+                    #background_masks[right_index], right_maps[0], right_maps[1],
+                    #cv2.INTER_NEAREST)
+                # TODO: We don't actually filter using the right background mask yet
 
             #if self.visual_debug:
             #left = numpy.array(left_image_rectified)
@@ -308,6 +319,8 @@ class OpenCVStereoMatcher():
             #continue
             matcher = self.matchers[pair_index]
             disparity_image = matcher.compute(left_image_rectified, right_image_rectified)
+            assert False
+
             # WARNING! OpenCV 3 Apparently doesn't support floating point disparity anymore,
             # and 16 bit disparity needs to be divided by 16
             if disparity_image.dtype == numpy.int16:
@@ -320,10 +333,18 @@ class OpenCVStereoMatcher():
                 pylab.imshow(numpy.vstack((im,)))
                 pylab.show()
                 #continue
+            # Filter the stereo correspondences based on the background_masks.
+            if background_masks is not None:
+                DISPARITY_SHIFT_16S = 4
+                MinDisparity = self.options['StereoMatcher']['MinDisparity']
+                filtered_sentinel = (MinDisparity - 1) << DISPARITY_SHIFT_16S # Match what opencv is using.
+                disparity_image[left_background_rectified>0] = filtered_sentinel
+                # TODO: Maybe something could be gained by filtering on the right image as well...
 
-                # Convert the depth map to a point cloud
+            # Convert the depth map to a point cloud
             Q = self.Q_array[pair_index]
             threedeeimage = cv2.reprojectImageTo3D(disparity_image, Q, handleMissingValues=True,ddepth=cv2.CV_32F)
+            # Reminder: If True, handleMissingValues replaces filtered_sentinel with 10000.0
             threedeeimage = numpy.array(threedeeimage)
             #if self.visual_debug:
             #depth_image = threedeeimage[:,:,2]
@@ -335,7 +356,7 @@ class OpenCVStereoMatcher():
             xyz = threedeeimage.reshape((-1,3)) # x,y,z now in three columns, in left rectified camera coordinates
 
             z = xyz[:,2]
-            goodz = z < 1e3
+            goodz = z < 9999.0
             xyz_filtered = xyz[goodz,:]
             #print('pixels before filtering: ',h*w, "after filtering:" ,xyz_filtered.shape[0] )
 
@@ -417,6 +438,7 @@ def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirect
 
 
 if __name__=='__main__':
+    # Because of Python's pain in the ass module system you need to run this script from the parent directory, or keep twiddling the leading dots in the import statements.
     print('Attempting to run a reconstruction using opencv')
     imagesPath = Path('data/undistorted_images/2016_10_24__17_43_02')
     workDirectory=Path('working_directory_opencv')
