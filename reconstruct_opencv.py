@@ -284,9 +284,8 @@ class OpenCVStereoMatcher():
         assert self.all_camera_parameters is not None, 'Camera parameters not loaded yet; You should run load_camera_parameters first!'
 
 
-        t1 = time()
-        xyz_global_array = []
-        for pair_index, (left_index,right_index) in enumerate(topologies[self.topology]):
+        xyz_global_array = [None]*len(topologies[self.topology])
+        def run_for_one_pair(pair_index, left_index, right_index):
             print('Performing Stereo matching between cameras', left_index,'and',right_index,'...')
             left_image, right_image = images[left_index], images[right_index]
 
@@ -319,7 +318,6 @@ class OpenCVStereoMatcher():
             #continue
             matcher = self.matchers[pair_index]
             disparity_image = matcher.compute(left_image_rectified, right_image_rectified)
-            assert False
 
             # WARNING! OpenCV 3 Apparently doesn't support floating point disparity anymore,
             # and 16 bit disparity needs to be divided by 16
@@ -364,7 +362,19 @@ class OpenCVStereoMatcher():
             xyz_global = numpy.dot(xyz_filtered, R_left_rectified_to_global.T) + T_left_rectified_to_global.T  # TODO: combine this with the the multipilication by Q inside of reprojectImageTo3D above. Note that different filtering may be required.
 
             #save_ply(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
-            xyz_global_array.append(xyz_global)
+            #xyz_global_array.append(xyz_global)
+            xyz_global_array[pair_index] = xyz_global
+
+        t1 = time()
+        import threading
+        threads = []
+        for pair_index, (left_index,right_index) in enumerate(topologies[self.topology]):
+            threads.append(threading.Thread(target=run_for_one_pair, args=(pair_index,left_index,right_index)))
+            #run_for_one_pair(pair_index, left_index, right_index)
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
 
         xyz = numpy.vstack(xyz_global_array)
         t2 = time()
@@ -443,5 +453,5 @@ if __name__=='__main__':
     imagesPath = Path('data/undistorted_images/2016_10_24__17_43_02')
     workDirectory=Path('working_directory_opencv')
     options = DefaultOptionsBM
-    run_opencv(imagesPath=imagesPath, workDirectory=workDirectory, options=options, visual_debug=False)
+    run_opencv(imagesPath=imagesPath, workDirectory=workDirectory, destDir=workDirectory, options=options, visual_debug=False)
     #run_opencv(imagesPath, options=options) # to test temp directory
