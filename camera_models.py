@@ -10,6 +10,9 @@
 
 import numpy
 from numpy import sqrt
+from numba import jit
+
+import mvs
 
 halcon_model_types = ['area_scan_division', 'area_scan_polynomial']
 
@@ -41,6 +44,7 @@ def distort_division(u, v, kappa):
     v_tilde = scaling * v
     return u_tilde, v_tilde
 
+@jit
 def undistort_polynomial(u_tilde, v_tilde, k1, k2, k3, p1, p2):
     """
     From the HALCON Docs:
@@ -61,13 +65,41 @@ def undistort_polynomial(u_tilde, v_tilde, k1, k2, k3, p1, p2):
     u_tilde_to_2 = u_tilde**2
     v_tilde_to_2 = v_tilde**2
     r_to_2 = u_tilde_to_2 + v_tilde_to_2
-    r_to_4 = r_squared**2
-    r_to_6 = r_to_4 * r_squared
+    r_to_4 = r_to_2**2
+    r_to_6 = r_to_4 * r_to_2
     temp1 = k1 * r_to_2 + k2 * r_to_4 + k3 * r_to_6
     uv_tilde = u_tilde * v_tilde
     u = u_tilde + u_tilde * temp1 + p1 * (r_to_2 + 2 * u_tilde_to_2) + 2 * p2 * uv_tilde
     v = v_tilde = v_tilde * temp1 + 2 * p1 * uv_tilde + p2 * (r_to_2 + 2 * v_tilde_to_2)
+    #print("Warning, I suspect the HALCON documentation is WRONG about the direction of this transformation.")
     return u,v
+
+@jit
+def distort_polynomial(u,v,k1,k2,k3,p1,p2):
+    u_tilde,v_tilde = undistort_polynomial(u, v, k1, k2, k3, p1, p2)
+    return u_tilde,v_tilde
+
+from mvs import lookup_monochrome as lookup_monochrome_python
+lookup_monochrome = jit(lookup_monochrome_python)
+
+@jit
+def undistort_image_slow(im, pixel_h, pixel_w, cx, cy, k1,k2,k3,p1,p2):
+    # Takes cx, cy in pixels
+    # Takes pixel_h, pixel_w in m, like sx,sy in the HALCON .dat files.
+    output_image = numpy.zeros_like(im)
+    for vi in range(im.shape[0]):
+        v = (numpy.float(vi) - cy) * pixel_h
+        for ui in range(im.shape[1]):
+            u = (numpy.float(ui) - cx) * pixel_w
+            u_tilde,v_tilde = distort_polynomial(u,v,k1,k2,k3,p1,p2)
+            # Convert back to pixel indeces
+            ui_tilde = u_tilde/pixel_w + cx
+            vi_tilde = v_tilde/pixel_h + cy
+
+            # Do bilinear interpolation based lookup
+            intensity = lookup_monochrome(im, ui_tilde, vi_tilde)
+            output_image[vi, ui] = intensity
+    return output_image
 
 def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
                         cy, kappa=None):
