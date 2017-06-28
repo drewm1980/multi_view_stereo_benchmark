@@ -87,9 +87,9 @@ def distort_halcon_polynomial(u,v,k1,k2,k3,p1,p2):
 from mvs import lookup_monochrome as lookup_monochrome_python
 lookup_monochrome = jit(lookup_monochrome_python)
 
+@jit(cache=True)
 #def undistort_image_slow(im, pixel_h, pixel_w, cx, cy, k1,k2,k3,p1,p2):
-@jit
-def undistort_image_slow(im, pixel_h, pixel_w, cx, cy, kappa):
+def undistort_image_halcon_division_no_lut(im, pixel_h, pixel_w, cx, cy, kappa):
     # Takes cx, cy in pixels
     # Takes pixel_h, pixel_w in m, like sx,sy in the HALCON .dat files.
     output_image = numpy.zeros_like(im)

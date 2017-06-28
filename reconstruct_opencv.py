@@ -11,8 +11,8 @@ import os
 import inspect
 pwd = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
 
-from load_ply import save_ply
-from load_camera_info import load_intrinsics, load_extrinsics
+from .load_ply import save_ply
+from .load_camera_info import load_intrinsics, load_extrinsics
 
 import cv2
 
@@ -110,6 +110,7 @@ class OpenCVStereoMatcher():
     def __init__(self,
             options=DefaultOptionsBM,
             calibrationsPath=None,
+            all_camera_parameters=None,
             visual_debug=False,
             ):
         self.options = options
@@ -117,8 +118,12 @@ class OpenCVStereoMatcher():
         self.topology = options['CameraArray']['topology']
         self.visual_debug = visual_debug
 
-        assert calibrationsPath is not None, 'To initialize an OpenCVStereoMatcher, you must provide a path to the dirctory containing camera intrinsics and extrinsics!'
-        self.load_camera_parameters(calibrationsPath)
+        assert (calibrationsPath is None) != (all_camera_parameters is None), "Please pass exactly one of all_camera_parameters or calibrationsPath!"
+        if calibrationsPath is not None:
+            from .load_camera_info load load_all_camera_parameters
+            self.all_camera_parameters = load_all_camera_parameters(calibrationsPath)
+        if all_camera_parameters is not None:
+            self.all_camera_parameters = all_camera_parameters
 
         self.left_maps_array = []
         self.right_maps_array = []
@@ -250,38 +255,12 @@ class OpenCVStereoMatcher():
     def free_images(self):
         del self.images
 
-    def load_camera_parameters(self, calibrationsPath):
-        # Load the camera parameters for every camera in the array
-        all_camera_parameters = []
-        for i in range(self.num_cameras):
-            # Load the intrinsics
-            intrinsicsFilePath = calibrationsPath / ('intrinsics_camera%02i.txt' % (i + 1))
-            #print('Loading intrinsics for camera',i,'from',intrinsicsFilePath,'...')
-            assert intrinsicsFilePath.is_file(), "Couldn't find camera intrinsics in "+str(intrinsicsFilePath)
-            camera_matrix, distortion_coefficients, image_width, image_height = load_intrinsics(intrinsicsFilePath)
-            # The images must already be radially undistorted
-            assert(abs(distortion_coefficients[0]) < .000000001)
-            assert(abs(distortion_coefficients[1]) < .000000001)
-            assert(abs(distortion_coefficients[2]) < .000000001)
-            assert(abs(distortion_coefficients[3]) < .000000001)
-            assert(abs(distortion_coefficients[4]) < .000000001)
-
-            # Load the extrinsics
-            extrinsicsFilePath = calibrationsPath / ('extrinsics_camera%02i.txt' % (i + 1))
-            #print('Loading extrinsics for camera',i,'from',extrinsicsFilePath,'...')
-            R, T = load_extrinsics(extrinsicsFilePath)
-
-            # OpenCV expects the inverse of the transform that HALCON exports!
-            R,T = R.T,numpy.dot(-R.T,T)
-            all_camera_parameters.append((camera_matrix, R, T, image_width, image_height))
-        self.all_camera_parameters = all_camera_parameters
-
     def run_from_memory(self, images, background_masks=None):
         """ Perform stereo reconstruction on a set of images already in memory, and return results in memory. 
         background_masks: an optional array of binary images where values >0 indicate regions of each image
         that are certainly in the background.
         """
-        assert self.all_camera_parameters is not None, 'Camera parameters not loaded yet; You should run load_camera_parameters first!'
+        assert self.all_camera_parameters is not None, 'Camera parameters not loaded yet; You should run load_all_camera_parameters first!'
 
 
         t1 = time()
@@ -319,7 +298,7 @@ class OpenCVStereoMatcher():
             #continue
             matcher = self.matchers[pair_index]
             disparity_image = matcher.compute(left_image_rectified, right_image_rectified)
-            assert False
+            #assert False
 
             # WARNING! OpenCV 3 Apparently doesn't support floating point disparity anymore,
             # and 16 bit disparity needs to be divided by 16
@@ -398,7 +377,7 @@ class OpenCVStereoMatcher():
         self.load_images(imagesPath)
 
         if calibrationsPath is not None:
-            self.load_camera_parameters(calibrationsPath)
+            self.load_all_camera_parameters(calibrationsPath)
 
         # By default, work in a temporary directory.
         # "with...as" ensures the temp directory is cleared even if there is an error below.

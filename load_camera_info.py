@@ -67,10 +67,10 @@ def load_halcon_intrinsics(filePath):
         d['Kappa'] = 0.0
         return d
 
-    if 'Kappa' in d:
-        print('Loading a camera with non-zero kappa... sanity checking distortion model invertiblity...')
-        from camera_models import check_distortion_model_invertability
-        check_distortion_model_invertability(d)
+    #if 'Kappa' in d:
+        #print('Loading a camera with non-zero kappa... sanity checking distortion model invertiblity...')
+        #from camera_models import check_distortion_model_invertability
+        #check_distortion_model_invertability(d)
 
     return d
 
@@ -105,12 +105,17 @@ def load_intrinsics(filePath):
         k3 = d['Poly3']
         p1 = d['Poly4'] * .001
         p2 = d['Poly5'] * .001
-        distCoeffs = (k1, k2, p1, p2, k3)
+        distCoeffs = {'k1':k1, 'k2':k2, 'p1':p1, 'p2':p2, 'k3':k3}
+        distCoeffs['model'] = 'halcon_area_scan_polynomial'
     elif 'Kappa' in d:
-        distCoeffs = (d['Kappa'],)
+        distCoeffs = {'kappa':d['Kappa']}
+        distCoeffs['model'] = 'halcon_division'
     else:
         distCoeffs = ()
-
+    distCoeffs['cx'] = cx  # Note: these are also in the cameraMatrix, but are also used when compensating radial distortion
+    distCoeffs['cy'] = cy
+    distCoeffs['pixel_w'] = d['Sx']
+    distCoeffs['pixel_h'] = d['Sy']
     return cameraMatrix, distCoeffs, d['ImageWidth'], d['ImageHeight']
 
 
@@ -247,3 +252,51 @@ def load_extrinsics(filePath):
             return load_halcon_extrinsics_rodriguez(filePath)
     #print('Homogeneous type HALCON extrinsics file detected!')
     return load_halcon_extrinsics_homogeneous(filePath)
+
+
+def load_all_camera_parameters(calibration_path, throw_error_if_radial_distortion=False):
+    ''' Load the camera parameters for every camera in the array '''
+    
+    # I have a couple filename conventions floating around to support...
+    num_cameras = 0
+    if num_cameras == 0:
+        num_cameras = len(list(calibration_path.glob("intrinsics_division*.dat")))
+        intrinsics_pattern = 'intrinsics_division%02i.dat'
+        extrinsics_pattern = 'extrinsics_division%02i.dat'
+    if num_cameras == 0:
+        num_cameras = len(list(calibration_path.glob("intrinsics_camera*.dat")))
+        intrinsics_pattern = 'intrinsics_camera%02i.txt'
+        extrinsics_pattern = 'extrinsics_camera%02i.txt'
+    if num_cameras == 0:
+        print('calibration_path:',calibration_path)
+        assert False, "Couldn't make sense of the filenames for the camera calibrations..."
+        
+    all_camera_parameters = []
+    for i in range(num_cameras):
+        # Load the intrinsics
+        intrinsicsFilePath = calibration_path / (intrinsics_pattern % (i + 1))
+        print('Loading intrinsics for camera',i,'from',intrinsicsFilePath,'...')
+        assert intrinsicsFilePath.is_file(), "Couldn't find camera intrinsics in "+str(intrinsicsFilePath)
+        camera_matrix, distortion_coefficients, image_width, image_height = load_intrinsics(intrinsicsFilePath)
+        if throw_error_if_radial_distortion:
+            # The images must already be radially undistorted
+            if distortion_coefficients['model'] == 'halcon_area_scan_polynomial':
+                assert(abs(distortion_coefficients['p1']) < .000000001)
+                assert(abs(distortion_coefficients['p2']) < .000000001)
+                assert(abs(distortion_coefficients['k1']) < .000000001)
+                assert(abs(distortion_coefficients['k2']) < .000000001)
+                assert(abs(distortion_coefficients['k3']) < .000000001)
+            if distortion_coefficients['model']== 'halcon_divsion':
+                assert(abs(distortion_coefficients['kappa']) < .000000001)
+
+        # Load the extrinsics
+        extrinsicsFilePath = calibration_path / (extrinsics_pattern % (i + 1))
+        print('Loading extrinsics for camera',i,'from',extrinsicsFilePath,'...')
+        R, T = load_extrinsics(extrinsicsFilePath)
+
+        # OpenCV expects the inverse of the transform that HALCON exports!
+        R,T = R.T,numpy.dot(-R.T,T)
+        camera_parameters = {'camera_matrix':camera_matrix, 'R':R, 'T':T, 'image_width':image_width, 'image_height':image_height}
+        camera_parameters.update(distortion_coefficients)
+        all_camera_parameters.append(camera_parameters)
+    return all_camera_parameters # List of dictionaries
