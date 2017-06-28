@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
 
 # Code for testing camera models
 
@@ -26,28 +26,31 @@ def test_undistortion():
     from mvs import load_image_preserving_type
     im = load_image_preserving_type(testImage)
     from load_camera_info import load_halcon_intrinsics
-    distorted_intrinsics = load_halcon_intrinsics(Path('data_for_unit_tests/intrinsics_polynomial01.dat'))
+    #distorted_intrinsics = load_halcon_intrinsics(Path('data_for_unit_tests/intrinsics_polynomial01.dat'))
+    distorted_intrinsics = load_halcon_intrinsics(Path('data_for_unit_tests/intrinsics_division01.dat'))
     #undistorted_intrinsics = load_halcon_intrinsics(Path('data_for_unit_tests/intrinsics_undistorted.txt'))
     pixel_h = distorted_intrinsics['Sy']
     pixel_w = distorted_intrinsics['Sx']
     cx = distorted_intrinsics['Cx']
     cy = distorted_intrinsics['Cy']
-    k1 = distorted_intrinsics['Poly1']
-    k2 = distorted_intrinsics['Poly2']
-    k3 = distorted_intrinsics['Poly3']
-    p1 = distorted_intrinsics['Poly4'] * .001
-    p2 = distorted_intrinsics['Poly5'] * .001
+    #k1 = distorted_intrinsics['Poly1']
+    #k2 = distorted_intrinsics['Poly2']
+    #k3 = distorted_intrinsics['Poly3']
+    #p1 = distorted_intrinsics['Poly4'] * .001
+    #p2 = distorted_intrinsics['Poly5'] * .001
+    kappa = distorted_intrinsics['Kappa']
     #k1,k2,k3,p1,p2 = (0,0,0,0,0) # For testing
     from time import time
-    im_undistorted = undistort_image_slow(im, pixel_h, pixel_w, cx, cy, k1,k2,k3,p1,p2) # warmup
+    #im_undistorted = undistort_image_slow(im, pixel_h, pixel_w, cx, cy, k1,k2,k3,p1,p2) # warmup
+    im_undistorted = undistort_image_slow(im, pixel_h, pixel_w, cx, cy, kappa) # warmup
     t1 = time()
-    im_undistorted = undistort_image_slow(im, pixel_h, pixel_w, cx, cy, k1,k2,k3,p1,p2) # 36 ms
+    #im_undistorted = undistort_image_slow(im, pixel_h, pixel_w, cx, cy, k1,k2,k3,p1,p2) # 36 ms
+    im_undistorted = undistort_image_slow(im, pixel_h, pixel_w, cx, cy, kappa)
     t2 = time()
     print("Undistorting the image without any lookup tables took ",t2-t1,"seconds")
     from skimage.io import imsave
-    imsave('undistorted.png',im_undistorted)
+    imsave('data_for_unit_tests/test_undistortion_undistorted_image.png',im_undistorted)
     return im_undistorted
-    
     
 
 if __name__=='__main__':

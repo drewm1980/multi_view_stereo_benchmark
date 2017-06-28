@@ -69,7 +69,7 @@ def load_halcon_intrinsics(filePath):
 
     if 'Kappa' in d:
         print('Loading a camera with non-zero kappa... sanity checking distortion model invertiblity...')
-        from .camera_models import check_distortion_model_invertability
+        from camera_models import check_distortion_model_invertability
         check_distortion_model_invertability(d)
 
     return d
