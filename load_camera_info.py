@@ -264,7 +264,7 @@ def load_all_camera_parameters(calibration_path, throw_error_if_radial_distortio
         intrinsics_pattern = 'intrinsics_division%02i.dat'
         extrinsics_pattern = 'extrinsics_division%02i.dat'
     if num_cameras == 0:
-        num_cameras = len(list(calibration_path.glob("intrinsics_camera*.dat")))
+        num_cameras = len(list(calibration_path.glob("intrinsics_camera*.txt")))
         intrinsics_pattern = 'intrinsics_camera%02i.txt'
         extrinsics_pattern = 'extrinsics_camera%02i.txt'
     if num_cameras == 0:

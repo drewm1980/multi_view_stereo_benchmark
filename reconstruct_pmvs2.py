@@ -12,7 +12,7 @@ pwd = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
 pmvs2Path = Path(pwd) / 'extern/CMVS-PMVS/program/main/pmvs2'
 assert pmvs2Path.is_file(), "pmvs2 binary not found. Try running bootstrap.sh?"
 
-from load_camera_info import load_intrinsics, load_extrinsics
+from .load_camera_info import load_intrinsics, load_extrinsics
 
 
 def set_up_visualize_subdirectory(inputPath,destPath):
@@ -67,12 +67,12 @@ def set_up_txt_subdirectory(inputPath,destPath):
         intrinsicsFilePath = inputPath / ('intrinsics_camera%02i.txt' % (i + 1))
         assert intrinsicsFilePath.is_file(), "Couldn't find camera intrinsics in "+str(intrinsicsFilePath)
         cameraMatrix, distCoffs, imageWidth, imageHeight = load_intrinsics(intrinsicsFilePath)
-        # The images must already be radially undistorted
-        assert(abs(distCoffs[0]) < .000000001)
-        assert(abs(distCoffs[1]) < .000000001)
-        assert(abs(distCoffs[2]) < .000000001)
-        assert(abs(distCoffs[3]) < .000000001)
-        assert(abs(distCoffs[4]) < .000000001)
+        ## The images must already be radially undistorted!
+        #assert(abs(distCoffs[0]) < .000000001)
+        #assert(abs(distCoffs[1]) < .000000001)
+        #assert(abs(distCoffs[2]) < .000000001)
+        #assert(abs(distCoffs[3]) < .000000001)
+        #assert(abs(distCoffs[4]) < .000000001)
 
         # Load the extrinsics
         extrinsicsFilePath = inputPath / ('extrinsics_camera%02i.txt' % (i + 1))
@@ -285,30 +285,30 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
 
 # Some hard-coded options, roughly slow to fast
 pmvsOptionsDict = {
-    'pmvs_tuned1': PMVS2Options(minImageNum=3,
-                                CPU=7,
-                                useVisData=1,
-                                numNeighbors=2,
-                                oimages=0,
-                                sequence=-1,
-                                wsize=8,
-                                numCameras=12,
-                                timages=None,
-                                level=3,
-                                threshold=0.7,
-                                csize=6),
-    'pmvs_tuned2': PMVS2Options(numCameras=12,
-                                level=3,
-                                csize=5,
-                                threshold=0.6,
-                                wsize=6,
-                                minImageNum=3,
-                                CPU=7,
-                                useVisData=1,
-                                sequence=-1,
-                                timages=None,
-                                oimages=0,
-                                numNeighbors=2),
+    #'pmvs_tuned1': PMVS2Options(minImageNum=3,
+                                #CPU=7,
+                                #useVisData=1,
+                                #numNeighbors=2,
+                                #oimages=0,
+                                #sequence=-1,
+                                #wsize=8,
+                                #numCameras=12,
+                                #timages=None,
+                                #level=3,
+                                #threshold=0.7,
+                                #csize=6),
+    #'pmvs_tuned2': PMVS2Options(numCameras=12,
+                                #level=3,
+                                #csize=5,
+                                #threshold=0.6,
+                                #wsize=6,
+                                #minImageNum=3,
+                                #CPU=7,
+                                #useVisData=1,
+                                #sequence=-1,
+                                #timages=None,
+                                #oimages=0,
+                                #numNeighbors=2),
     'pmvs_medium': PMVS2Options(
         numCameras=12, level=1, csize=4,
         numNeighbors=2)

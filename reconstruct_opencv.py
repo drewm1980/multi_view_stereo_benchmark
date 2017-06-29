@@ -101,8 +101,8 @@ TunedOptionsBM = {'CameraArray': {'channels': 1,
 
 # Some hard-coded options, roughly slow to fast
 opencvOptionsDict = {
-    #'opencv_block_matcher_defaults': DefaultOptionsBM,
-    'opencv_tuned_block_matcher': TunedOptionsBM,
+    'opencv_block_matcher_defaults': DefaultOptionsBM,
+    #'opencv_tuned_block_matcher': TunedOptionsBM,
 }
 opencvOptionNames = opencvOptionsDict.keys()
 
@@ -266,7 +266,7 @@ class OpenCVStereoMatcher():
             #cv2.waitKey(0)
             #cv2.destroyAllWindows()
             expected_parameters = self.all_camera_parameters[i]
-            w,h = expected_parameters[3], expected_parameters[4]
+            w,h = expected_parameters['image_width'], expected_parameters['image_height']
             assert grayImage.shape == (h,w), 'Mismatch in image sizes!'
         self.images = images
 
