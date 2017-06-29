@@ -138,7 +138,7 @@ class OpenCVStereoMatcher():
 
         assert (calibrationsPath is None) != (all_camera_parameters is None), "Please pass exactly one of all_camera_parameters or calibrationsPath!"
         if calibrationsPath is not None:
-            from .load_camera_info load load_all_camera_parameters
+            from .load_camera_info import load_all_camera_parameters
             self.all_camera_parameters = load_all_camera_parameters(calibrationsPath)
         if all_camera_parameters is not None:
             self.all_camera_parameters = all_camera_parameters
@@ -150,8 +150,8 @@ class OpenCVStereoMatcher():
         self.extrinsics_left_rectified_to_global_array = []
 
         for pair_index, (left_index,right_index) in enumerate(topologies[self.topology]):
-            left_camera_matrix, left_R, left_T, left_width, left_height = self.all_camera_parameters[left_index]
-            right_camera_matrix, right_R, right_T, right_width, right_height = self.all_camera_parameters[right_index]
+            left_camera_matrix, left_R, left_T, left_width, left_height = [self.all_camera_parameters[left_index][key] for key in ('camera_matrix','R','T','image_width','image_height')]
+            right_camera_matrix, right_R, right_T, right_width, right_height = [self.all_camera_parameters[right_index][key] for key in ('camera_matrix','R','T','image_width','image_height')]
             assert left_width == right_width, "Images of mismatched resolution is unsupported by opencv!"
             assert left_height == right_height, "Images of mismatched resolution is unsupported by opencv!"
             h,w = left_height, left_width
@@ -273,7 +273,7 @@ class OpenCVStereoMatcher():
     def free_images(self):
         del self.images
 
-    def run_from_memory(self, images, background_masks=None):
+    def run_from_memory(self, images, background_masks=None, dump_ply_files=False):
         """ Perform stereo reconstruction on a set of images already in memory, and return results in memory. 
         background_masks: an optional array of binary images where values >0 indicate regions of each image
         that are certainly in the background.
@@ -358,7 +358,8 @@ class OpenCVStereoMatcher():
             R_left_rectified_to_global, T_left_rectified_to_global = self.extrinsics_left_rectified_to_global_array[pair_index]
             xyz_global = numpy.dot(xyz_filtered, R_left_rectified_to_global.T) + T_left_rectified_to_global.T  # TODO: combine this with the the multipilication by Q inside of reprojectImageTo3D above. Note that different filtering may be required.
 
-            save_ply(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
+            if dump_ply_files:
+                save_ply(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
             #xyz_global_array.append(xyz_global)
             xyz_global_array[pair_index] = xyz_global
 
