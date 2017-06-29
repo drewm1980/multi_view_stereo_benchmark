@@ -12,7 +12,7 @@ pwd = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
 pmvs2Path = Path(pwd) / 'extern/CMVS-PMVS/program/main/pmvs2'
 assert pmvs2Path.is_file(), "pmvs2 binary not found. Try running bootstrap.sh?"
 
-from .load_camera_info import load_intrinsics, load_extrinsics
+from load_camera_info import load_intrinsics, load_extrinsics
 
 
 def set_up_visualize_subdirectory(inputPath,destPath):
@@ -105,7 +105,13 @@ class PMVS2Options():
                  threshold=0.6,
                  wsize=7, # colors
                  minImageNum=2,
-                 CPU=8,
+                 #CPU=8, # For a quad core with hyperthreading
+                 #CPU=20, # For a 20 core with hyperthreading
+                 CPU=40, # For a 20 core with hyperthreading
+                 #CPU=80, # For a 20 core with hyperthreading
+                 #CPU=10, # For a 20 core with hyperthreading
+                 #CPU=20, # For a 20 core with hyperthreading
+                 #CPU=1, # For a 20 core with hyperthreading
                  useVisData=1,
                  sequence=-1,
                  timages=None,
@@ -340,6 +346,8 @@ if __name__=='__main__':
     print('Attempting to run a reconstruction using pmvs')
     imagesPath = Path('data/undistorted_images/2016_10_24__17_43_02')
     workDirectory=Path('working_directory_pmvs')
-    options = pmvsOptionsDict['pmvs_2_2_1']
-    #run_pmvs(imagesPath, workDirectory=workDirectory, options=options)
-    run_pmvs(imagesPath, options=options) # to test temp directory
+    #options = pmvsOptionsDict['pmvs_2_2_1']
+    options = pmvsOptionsDict['pmvs_medium']
+    #options = pmvsOptionsDict['pmvs_tuned1']
+    run_pmvs(imagesPath, workDirectory=workDirectory, options=options)
+    #run_pmvs(imagesPath, options=options) # to test temp directory

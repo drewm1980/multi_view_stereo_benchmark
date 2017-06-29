@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+# Script to run pmvs2 outside of python or benchmarking purposes.
+# Re-runs the last reconstruction 10 times
+
+(
+cd working_directory_pmvs
+time sudo chrt --rr 99 ../extern/CMVS-PMVS/program/main/pmvs2 ./ option.txt
+
+)

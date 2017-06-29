@@ -7,6 +7,17 @@ import pathlib
 from pathlib import Path
 from time import time
 
+# Optional VTune instrumentation
+try:
+    import itt
+    itt_resume = itt.resume
+    itt_detach = itt.detach
+except:
+    print("ITT not present; not instrumenting for Intel VTune!")
+    nop = lambda:None
+    itt_resume = nop
+    itt_detach = nop
+
 import os
 import inspect
 pwd = os.path.dirname(os.path.abspath(inspect.stack()[0][1]))
@@ -27,8 +38,8 @@ StereoRectifyOptions = {'imageSize':(1280,1024),
                         'flags':(0,cv2.CALIB_ZERO_DISPARITY)[0], # TODO explore other flags
                         'newImageSize':(1280,1024),
                         'alpha':0.5}
-StereoMatcherOptions = {'MinDisparity': 10,
-                        'NumDisparities': 320,
+StereoMatcherOptions = {'MinDisparity': -64, # Influences MAX depth
+                        'NumDisparities': 256, # Influences MIN depth
                         'BlockSize': 21,
                         'SpeckleWindowSize': 0, # Must be strictly positive to turn on speckle post-filter.
                         'SpeckleRange': 0, # Must be >= 0 to enable speckle post-filter
@@ -43,12 +54,13 @@ StereoBMOptions = {
                    #'ROI1', # I don't really want to set these
                    #'ROI2'
                    }
+
 StereoSGBMOptions = {'PreFilterCap': 0,
                      'UniquenessRatio': 0,
-                     'P1': 10,
-                     'P2': 10,
+                     'P1': 16*21*21, # "Depth Change Cost in Ensenso terminology"
+                     'P2': 16*21*21, # "Depth Step Cost in Ensenso terminology"
                      'Mode': (cv2.StereoSGBM_MODE_SGBM, cv2.StereoSGBM_MODE_HH,
-                              cv2.StereoSGBM_MODE_SGBM_3WAY)[0]}
+                              cv2.StereoSGBM_MODE_SGBM_3WAY)[1]}
 RemapOptions = {'interpolation':cv2.INTER_LINEAR}
 CameraArrayOptions = {
                         'channels':1,
@@ -58,6 +70,12 @@ CameraArrayOptions = {
 DefaultOptionsBM = {'StereoRectify':StereoRectifyOptions,
         'StereoMatcher':StereoMatcherOptions,
         'StereoBM':StereoBMOptions,
+        'CameraArray':CameraArrayOptions,
+        'Remap':RemapOptions}
+
+DefaultOptionsSGBM = {'StereoRectify':StereoRectifyOptions,
+        'StereoMatcher':StereoMatcherOptions,
+        'StereoSGBM':StereoSGBMOptions,
         'CameraArray':CameraArrayOptions,
         'Remap':RemapOptions}
 
@@ -263,9 +281,8 @@ class OpenCVStereoMatcher():
         assert self.all_camera_parameters is not None, 'Camera parameters not loaded yet; You should run load_all_camera_parameters first!'
 
 
-        t1 = time()
-        xyz_global_array = []
-        for pair_index, (left_index,right_index) in enumerate(topologies[self.topology]):
+        xyz_global_array = [None]*len(topologies[self.topology])
+        def run_for_one_pair(pair_index, left_index, right_index):
             print('Performing Stereo matching between cameras', left_index,'and',right_index,'...')
             left_image, right_image = images[left_index], images[right_index]
 
@@ -298,7 +315,6 @@ class OpenCVStereoMatcher():
             #continue
             matcher = self.matchers[pair_index]
             disparity_image = matcher.compute(left_image_rectified, right_image_rectified)
-            #assert False
 
             # WARNING! OpenCV 3 Apparently doesn't support floating point disparity anymore,
             # and 16 bit disparity needs to be divided by 16
@@ -342,12 +358,32 @@ class OpenCVStereoMatcher():
             R_left_rectified_to_global, T_left_rectified_to_global = self.extrinsics_left_rectified_to_global_array[pair_index]
             xyz_global = numpy.dot(xyz_filtered, R_left_rectified_to_global.T) + T_left_rectified_to_global.T  # TODO: combine this with the the multipilication by Q inside of reprojectImageTo3D above. Note that different filtering may be required.
 
-            #save_ply(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
-            xyz_global_array.append(xyz_global)
+            save_ply(xyz_global, 'pair_'+str(left_index)+'_'+str(right_index)+'.ply')
+            #xyz_global_array.append(xyz_global)
+            xyz_global_array[pair_index] = xyz_global
+
+        itt_resume()
+        t1 = time()
+        import threading
+        threads = []
+        for pair_index, (left_index,right_index) in enumerate(topologies[self.topology]):
+            threads.append(threading.Thread(target=run_for_one_pair, args=(pair_index,left_index,right_index)))
+            #run_for_one_pair(pair_index, left_index, right_index)
+        run_in_parallel = True
+        if run_in_parallel:
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        else:
+            for thread in threads:
+                thread.start()
+                thread.join()
 
         xyz = numpy.vstack(xyz_global_array)
         t2 = time()
         dt = t2-t1 # seconds. 
+        itt_detach()
 
         return xyz, dt
 
@@ -422,5 +458,6 @@ if __name__=='__main__':
     imagesPath = Path('data/undistorted_images/2016_10_24__17_43_02')
     workDirectory=Path('working_directory_opencv')
     options = DefaultOptionsBM
-    run_opencv(imagesPath=imagesPath, workDirectory=workDirectory, options=options, visual_debug=False)
+    #options = DefaultOptionsSGBM
+    run_opencv(imagesPath=imagesPath, workDirectory=workDirectory, destDir=workDirectory, options=options, visual_debug=False)
     #run_opencv(imagesPath, options=options) # to test temp directory
