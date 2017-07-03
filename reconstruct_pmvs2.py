@@ -15,7 +15,7 @@ assert pmvs2Path.is_file(), "pmvs2 binary not found. Try running bootstrap.sh?"
 from .load_camera_info import load_intrinsics, load_extrinsics
 
 
-def set_up_visualize_subdirectory(inputPath,destPath):
+def set_up_visualize_subdirectory(images=None, inputPath=None, destPath=None):
     """
     Create the "visualize" subdirectory required by PMVS
     Inputs:
@@ -23,14 +23,16 @@ def set_up_visualize_subdirectory(inputPath,destPath):
     destPath -- full path to a directory where the "visualize" subdir will be 
                 created
     """
-    import subprocess
-    import glob
+    assert destPath is not None: "destPath is a required argument!"
+    assert (images is None)!=(inputPath is None), 'Please pass either "images" or "inputPath" but not both!'
+
     visualizePath = destPath / 'visualize'
     if not visualizePath.is_dir():
         visualizePath.mkdir()
 
     print('Setting up visualize subdirectory in ' + str(visualizePath)+'...')
 
+    import glob
     numCameras = len(list((inputPath.glob("*.png"))))
     for i in range(numCameras):
         sourceFilename = "image_camera%02i.png"%(i+1)
@@ -40,6 +42,7 @@ def set_up_visualize_subdirectory(inputPath,destPath):
         # Call image magick as a binary to convert the images
         args = ['convert',str(sourcePath),str(destPath)]
         print('Running command: ' + ' '.join(args)+' ...')
+        import subprocess
         subprocess.check_output(args=args)
 
 
@@ -180,11 +183,16 @@ def write_vis_file_ring(numCameras,numNeighbors=1,visFilePath=Path('vis.dat')):
             fd.write('\n')
 
 
-def set_up_pmvs_tree(inputPath, destPath, options=None):
+def set_up_pmvs_tree(images=None, all_camera_parameters=None, inputPath=None, destPath=None, options=None):
     """ Set up a PMVS style file tree in destPath.
     inputPath contains images and HALCON camera parameter files."""
-    set_up_visualize_subdirectory(inputPath,destPath)
-    set_up_txt_subdirectory(inputPath,destPath)
+    assert destPath is not None, "set_up_pmvs_tree requires a destination path!"
+
+    assert (images is None)==(all_camera_parameters is None), "Please pass both or neither of images and all_camera_parameters"
+    assert (images is None)!=(inputPath is None), 'Please pass either "images" or "inputPath" but not both!'
+
+    set_up_visualize_subdirectory(images=images,inputPath=inputPath,destPath=destPath)
+    set_up_txt_subdirectory(inputPath=inputPath,destPath=destPath)
 
     # Generate the empty directory where pmvs puts its ply files
     modelsDir = destPath / 'models'
@@ -238,7 +246,9 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
 
     imagesPath = imagesPath.resolve()
 
-    set_up_pmvs_tree(imagesPath, workDirectory, options=options)
+    set_up_pmvs_tree(inputPath=imagesPath,
+                     destPath=workDirectory,
+                     options=options)
 
     # Run PMVS2
     import subprocess
@@ -285,7 +295,7 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
 
 # Some hard-coded options, roughly slow to fast
 pmvsOptionsDict = {
-    #'pmvs_tuned1': PMVS2Options(minImageNum=3,
+                                #'pmvs_tuned1': PMVS2Options(minImageNum=3,
                                 #CPU=7,
                                 #useVisData=1,
                                 #numNeighbors=2,
@@ -297,7 +307,7 @@ pmvsOptionsDict = {
                                 #level=3,
                                 #threshold=0.7,
                                 #csize=6),
-    #'pmvs_tuned2': PMVS2Options(numCameras=12,
+                                #'pmvs_tuned2': PMVS2Options(numCameras=12,
                                 #level=3,
                                 #csize=5,
                                 #threshold=0.6,
@@ -314,30 +324,30 @@ pmvsOptionsDict = {
         numNeighbors=2)
     #,
     #'pmvs_2_2_1': PMVS2Options(
-        #numCameras=12, level=2, csize=2,
-        #numNeighbors=1),
+    #numCameras=12, level=2, csize=2,
+    #numNeighbors=1),
     #'pmvs_2_4_1': PMVS2Options(
-        #numCameras=12, level=2, csize=4,
-        #numNeighbors=1),
+    #numCameras=12, level=2, csize=4,
+    #numNeighbors=1),
     #'pmvs_2_8_1': PMVS2Options(
-        #numCameras=12, level=2, csize=8,
-        #numNeighbors=1),
+    #numCameras=12, level=2, csize=8,
+    #numNeighbors=1),
     #'pmvs_2_2_2': PMVS2Options(
-        #numCameras=12, level=2, csize=2,
-        #numNeighbors=2),
+    #numCameras=12, level=2, csize=2,
+    #numNeighbors=2),
     #'pmvs_2_4_2': PMVS2Options(
-        #numCameras=12, level=2, csize=4,
-        #numNeighbors=2),
+    #numCameras=12, level=2, csize=4,
+    #numNeighbors=2),
     #'pmvs_2_8_2': PMVS2Options(
-        #numCameras=12, level=2, csize=8,
-        #numNeighbors=2),
+    #numCameras=12, level=2, csize=8,
+    #numNeighbors=2),
     #'pmvs_1_4_2': PMVS2Options(
-        #numCameras=12, level=1, csize=4,
-        #numNeighbors=2)
+    #numCameras=12, level=1, csize=4,
+    #numNeighbors=2)
     #,
     #'pmvs_0_4_2': PMVS2Options(
-        #numCameras=12, level=0, csize=4,
-        #numNeighbors=2
+    #numCameras=12, level=0, csize=4,
+    #numNeighbors=2
     #)  # Used for generating the references (followed by hand cleanup)
 }
 pmvsOptionNames = pmvsOptionsDict.keys()
