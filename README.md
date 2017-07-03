@@ -24,7 +24,7 @@ For context, this benchmark is similar to the Middlebury Multi-View Stereo Bench
 1. On the upside, our imgages are all captured simultaneously, so there is no illumination variation between shots, as there is with a spherical gantry
 1. We do not have a fancy online interface for viewing results or submissions, etc... 
 
-A note about rigor: this is NOT a research oriented benchmark. I am developing it in one day. Think of it as a tool for us to use in communication with vendors, that is at least better than looking at one point cloud and going "meh, looks good..."
+A note about rigor: this is NOT a research oriented benchmark. It only aspires to be more rigorous than evaluating point clouds just by looking at them.
 
 ## Dependencies
 
@@ -38,10 +38,7 @@ C++ development stuff
 python stuff
     `sudo apt-get install python3 python3-numpy python3-pandas python3-scipy python3-networkx`
 
-Optional:
-For one of my point cloud comparison implementations, I used the default pcl in ubuntu 14.04:
-    `sudo apt-get install libpcl-1.7-all-dev`
-At the time of writing you can ignore that.
+I was able to run the code with the same dependencies installed with a conda python3 environment on Ubuntu 16.04 today (July 3 2017).
 
 ## Building
 
@@ -76,12 +73,14 @@ Note: If you're having import path problems, you're not alone. Read http://pytho
 Algorithms in the benchmark:
 
 1. PMVS2, fully working
+1. OpenCV StereoBM and StereoSGBM, fully working
 1. gipuma, compiles and runs, full pipeline not working yet
 
 Input formats in the benchmark:
 
 1. PMVS2 format, complete
 1. middlebury format, coded but not tested at all yet
+1. HALCON camera calibration formats are used internally
 
 ## Licensing
 
