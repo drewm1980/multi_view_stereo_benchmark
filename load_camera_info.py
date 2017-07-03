@@ -294,7 +294,7 @@ def load_all_camera_parameters(calibration_path, throw_error_if_radial_distortio
         print('Loading extrinsics for camera',i,'from',extrinsicsFilePath,'...')
         R, T = load_extrinsics(extrinsicsFilePath)
 
-        # OpenCV expects the inverse of the transform that HALCON exports!
+        # OpenCV and PMVS2 expect the inverse of the transform that HALCON exports!
         R,T = R.T,numpy.dot(-R.T,T)
         camera_parameters = {'camera_matrix':camera_matrix, 'R':R, 'T':T, 'image_width':image_width, 'image_height':image_height}
         camera_parameters.update(distortion_coefficients)

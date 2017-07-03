@@ -13,40 +13,55 @@ pmvs2Path = Path(pwd) / 'extern/CMVS-PMVS/program/main/pmvs2'
 assert pmvs2Path.is_file(), "pmvs2 binary not found. Try running bootstrap.sh?"
 
 from .load_camera_info import load_intrinsics, load_extrinsics
-
+from .load_ply import load_ply
 
 def set_up_visualize_subdirectory(images=None, inputPath=None, destPath=None):
     """
-    Create the "visualize" subdirectory required by PMVS
+    Create the "visualize" subdirectory required by PMVS.
+        This directory contains the actual source images.
     Inputs:
     inputPath -- full path to a directory containing undistorted images
     destPath -- full path to a directory where the "visualize" subdir will be 
                 created
     """
-    assert destPath is not None: "destPath is a required argument!"
+    assert destPath is not None, "destPath is a required argument!"
     assert (images is None)!=(inputPath is None), 'Please pass either "images" or "inputPath" but not both!'
-
     visualizePath = destPath / 'visualize'
     if not visualizePath.is_dir():
         visualizePath.mkdir()
-
     print('Setting up visualize subdirectory in ' + str(visualizePath)+'...')
+    if images is not None:
+        from PIL import Image
+        for i,image in enumerate(images):
+            assert len(image.shape) in (2,3), 'image shape does not make sense for an image!'
+            # Single channel image, needs to be converted to color image or PMVS2 will complain!
+            if len(image.shape)==2 or image.shape[2]==1:
+                import cv2
+                color_image = cv2.cvtColor(image,cv2.COLOR_GRAY2RGB)
+            else:
+                assert image.shape[2]==3, 'image has more than one but not 3 channels!'
+                color_image = image
+            # PMVS takes .ppm files... maybe png too, but we don't want compression overhead
+            destFilename = "%08i.ppm"%(i)
+            destFilePath = visualizePath / destFilename
+            Image.fromarray(color_image).save(destFilePath)
+    else:
+        # use imageMagick to convert the format of the files to .ppm
+        import glob
+        numCameras = len(list((inputPath.glob("*.png"))))
+        for i in range(numCameras):
+            sourceFilename = "image_camera%02i.png"%(i+1)
+            destFilename = "%08i.ppm"%(i)
+            sourcePath = inputPath / sourceFilename
+            destFilePath = visualizePath / destFilename
+            # Call image magick as a binary to convert the images
+            args = ['convert',str(sourcePath),str(destFilePath)]
+            print('Running command: ' + ' '.join(args)+' ...')
+            import subprocess
+            subprocess.check_output(args=args)
 
-    import glob
-    numCameras = len(list((inputPath.glob("*.png"))))
-    for i in range(numCameras):
-        sourceFilename = "image_camera%02i.png"%(i+1)
-        destFilename = "%08i.ppm"%(i)
-        sourcePath = inputPath / sourceFilename
-        destPath = visualizePath / destFilename
-        # Call image magick as a binary to convert the images
-        args = ['convert',str(sourcePath),str(destPath)]
-        print('Running command: ' + ' '.join(args)+' ...')
-        import subprocess
-        subprocess.check_output(args=args)
 
-
-def set_up_txt_subdirectory(inputPath,destPath):
+def set_up_txt_subdirectory(inputPath=None,all_camera_parameters=None,destPath=None):
     """ Generate the txt/*.txt files that PMVS uses to
         input the projection matrices for the images it runs on.
         Input:
@@ -58,31 +73,23 @@ def set_up_txt_subdirectory(inputPath,destPath):
         destPath -- full path to a directory where the "txt" subdir will be 
                     created
     """
-
-    numCameras = len(list(inputPath.glob('*.png')))
+    assert destPath is not None, "destPath is a required argument!"
+    assert (inputPath is None)!=(all_camera_parameters is None), 'Please pass either "images" or "inputPath" but not both!'
 
     txtPath = destPath / 'txt'
     if not txtPath.is_dir():
         txtPath.mkdir()
 
+    if all_camera_parameters is None:
+        from load_camera_info import load_all_camera_parameters
+        all_camera_parameters = load_all_camera_parameters(inputPath, throw_error_if_radial_distortion=True)
+    numCameras = len(all_camera_parameters)
+
     for i in range(numCameras):
-        # Load the intrinsics
-        intrinsicsFilePath = inputPath / ('intrinsics_camera%02i.txt' % (i + 1))
-        assert intrinsicsFilePath.is_file(), "Couldn't find camera intrinsics in "+str(intrinsicsFilePath)
-        cameraMatrix, distCoffs, imageWidth, imageHeight = load_intrinsics(intrinsicsFilePath)
-        ## The images must already be radially undistorted!
-        #assert(abs(distCoffs[0]) < .000000001)
-        #assert(abs(distCoffs[1]) < .000000001)
-        #assert(abs(distCoffs[2]) < .000000001)
-        #assert(abs(distCoffs[3]) < .000000001)
-        #assert(abs(distCoffs[4]) < .000000001)
-
-        # Load the extrinsics
-        extrinsicsFilePath = inputPath / ('extrinsics_camera%02i.txt' % (i + 1))
-        R, T = load_extrinsics(extrinsicsFilePath)
-
-        # PMVS expects the inverse of the transform that HALCON exports!
-        R,T = R.T,numpy.dot(-R.T,T)
+        camera_parameters = all_camera_parameters[i]
+        cameraMatrix = camera_parameters['camera_matrix']
+        R = camera_parameters['R']
+        T = camera_parameters['T']
 
         # Compute the projection matrix pmvs2 wants,
         # which combines intrinsics and extrinsics
@@ -157,7 +164,7 @@ class PMVS2Options():
 
 def write_vis_file_ring(numCameras,numNeighbors=1,visFilePath=Path('vis.dat')):
     """ Generate a vis.dat file that pmvs2 expects for a camera array with 
-    ring topology and a configurable number of neighbors to be used for reconstruction 
+    ring topology and a configurable number of neighbors to be used for reconstruction.
     
     Inputs:
     numCameras -- The number of cameras in the ring
@@ -182,6 +189,33 @@ def write_vis_file_ring(numCameras,numNeighbors=1,visFilePath=Path('vis.dat')):
                 fd.write(str(neighbor_camera) + ' ')
             fd.write('\n')
 
+def write_vis_file_sphere(numCameras, visFilePath=None, destPath=None):
+    """ Generate a vis.dat file that pmvs2 expects for a camera with 
+        cameras arranged in stereo pairs.
+        Can also work for a ring as a special case, but there would be no matching between the pairs.
+    Inputs:
+    numCameras -- The number of cameras in the ring
+    visFilePath -- Path of the vis file to be created. Pass this or:
+    destPath -- Path of the directory where the vis.dat file will be created.
+    """
+
+    assert (visFilePath is None) != (destPath is None), 'Please pass one of visFilePath or destPath!'
+    visFileName=Path('vis.dat')
+    if visFilePath is None:
+        visFilePath = destPath / visFileName
+
+    assert numCameras%2==0, "write_vis_file_sphere expects an even number of cameras!"
+    with visFilePath.open('w') as fd:
+        fd.write('VISDATA\n')
+        fd.write(str(numCameras)+'\n')
+        for pair_index in range(int(numCameras/2)):
+            center_camera = pair_index * 2 # Left camera index
+            numNeighbors=1
+            fd.write(str(center_camera)+' ')
+            fd.write(str(numNeighbors)+' ')
+            neighbor_camera = center_camera+1 # Right camera index
+            fd.write(str(neighbor_camera) + ' ')
+            fd.write('\n')
 
 def set_up_pmvs_tree(images=None, all_camera_parameters=None, inputPath=None, destPath=None, options=None):
     """ Set up a PMVS style file tree in destPath.
@@ -199,7 +233,10 @@ def set_up_pmvs_tree(images=None, all_camera_parameters=None, inputPath=None, de
     if not modelsDir.is_dir():
         modelsDir.mkdir()
 
-    numCameras = len(list(inputPath.glob('*.png')))
+    if all_camera_parameters is not None:
+        numCameras = len(all_camera_parameters)
+    else:
+        numCameras = len(list(inputPath.glob('*.png')))
 
     # Generate PMVS options file
     if options is None:
@@ -218,6 +255,8 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
 
         The images must ALREADY be radially undistorted!
 
+        This single function interface is convenient, but does all I/O every time.
+
     Arguments:
     imagesPath -- A directory full of source images
     destDir -- The destination directory of the ply file. (default current directory)
@@ -226,8 +265,6 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
     workDirectory -- Existing directory where pmvs will work. (default generates a temp directory)
     runtimeFile -- The name of a file where info regarding the runtime will be stored.
     """
-    import shutil
-    import glob
 
     # By default, work in a temporary directory.
     # "with...as" ensures the temp directory is cleared even if there is an error below.
@@ -291,6 +328,92 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
         print('modelsDir: ' + str(modelsDir))
         print('plyPath: ' + str(plyPath))
         assert False
+
+
+class PMVS2StereoMatcher():
+    """ Wrapper class that calls PMVS2 on an array of cameras
+        Usage: Re-instantiate each time the camera geometry changes with a new calibrationsPath.
+            For each reconstruction, call either run_from_memory or run_from_disk depending on your use case.
+    """
+    def __init__(self,
+            options=None,
+            calibrationsPath=None,
+            all_camera_parameters=None,
+            work_directory=Path('pmvs2_work_directory'),
+            ):
+
+        assert (calibrationsPath is None) != (all_camera_parameters is None), "Please pass exactly one of all_camera_parameters or calibrationsPath!"
+        if calibrationsPath is not None:
+            from .load_camera_info import load_all_camera_parameters
+            self.all_camera_parameters = load_all_camera_parameters(calibrationsPath)
+        if all_camera_parameters is not None:
+            self.all_camera_parameters = all_camera_parameters
+
+        self.num_cameras = len(all_camera_parameters)
+        if options is None:
+            self.options = PMVS2Options(numCameras=self.num_cameras)
+        else:
+            self.options = options
+
+        if not work_directory.is_dir():
+            work_directory.mkdir()
+        self.work_directory = work_directory
+
+        # set_up_pmvs_tree
+        set_up_txt_subdirectory(all_camera_parameters=all_camera_parameters,destPath=work_directory)
+
+        # Generate the empty directory where pmvs puts its ply files
+        modelsDir = work_directory / 'models'
+        if not modelsDir.is_dir():
+            modelsDir.mkdir()
+
+        self.options.write_options_file(optionsDir=work_directory)
+
+        # TODO I didn't do good bookkeeping yet in the database for the topology.
+        # There should be a list of sensible matching topologies in all_camera_parameters,
+        # and it shoud be added to the on-disk format.
+        write_vis_file_sphere(self.num_cameras, destPath=work_directory)
+
+    def run_from_memory(self, images, foreground_masks=None, dump_ply_files=False):
+        """
+        Run PMVS2 on images that are already in memory.
+        Unfortunately, I still have to dump to disk, but at least I can hit the disk
+        as little as possible.
+        Inputs:
+        images -- The ALREADY UNDISTORTED images
+        foreground_masks -- unused, for API compatibility
+        dump_ply_files -- also unused, for API compatiblity
+        """
+        # TODO Blow away previous images just to be safe?
+        # TODO Blow away previous reconstruction just to be safe?
+
+        # Dump out the new images into the already existing PMVS2 file tree
+        set_up_visualize_subdirectory(images=images, destPath=self.work_directory)
+
+        # Run PMVS2
+        import subprocess
+        from time import time
+        args = [str(pmvs2Path), './', str('option.txt')] # Careful! That damn slash after the dot is CRITICAL
+        print('Running command ', ' '.join(args))
+        t1 = time()
+        proc = subprocess.Popen(args=args, cwd=str(self.work_directory), stdout=subprocess.PIPE) # Python 3.4
+        stdout, stderr = proc.communicate()
+        t2 = time()
+        dt = t2-t1
+        returncode = proc.returncode
+        print("pmvs2 output:")
+        print(stdout.decode('utf8'))
+        if returncode != 0:
+            print("WARNING! pmvs2 returned a non-zero return value!")
+
+        # Load the ply file from disk and return the xyz part
+        modelsDir = self.work_directory / 'models'
+        plyPath = modelsDir / Path('option.txt' + '.ply')
+        assert plyPath.is_file(), 'PMVS2 did not generate a .ply file!'
+        data, columnnames, columntypes = load_ply(plyPath, enableCaching=False)
+        assert columnnames[0:3] == ['x', 'y', 'z']
+        xyz = data[:, 0:3]
+        return xyz,dt
 
 
 # Some hard-coded options, roughly slow to fast
@@ -360,4 +483,4 @@ if __name__=='__main__':
     options = pmvsOptionsDict['pmvs_medium']
     #options = pmvsOptionsDict['pmvs_tuned1']
     run_pmvs(imagesPath, workDirectory=workDirectory, options=options)
-    #run_pmvs(imagesPath, options=options) # to test temp directory
+    #run_pmvs(imagesPath, options=options) # to te
