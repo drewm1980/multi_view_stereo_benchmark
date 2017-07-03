@@ -109,7 +109,7 @@ def load_intrinsics(filePath):
         distCoeffs['model'] = 'halcon_area_scan_polynomial'
     elif 'Kappa' in d:
         distCoeffs = {'kappa':d['Kappa']}
-        distCoeffs['model'] = 'halcon_division'
+        distCoeffs['model'] = 'halcon_area_scan_division'
     else:
         distCoeffs = ()
     distCoeffs['cx'] = cx  # Note: these are also in the cameraMatrix, but are also used when compensating radial distortion

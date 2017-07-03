@@ -273,10 +273,10 @@ class OpenCVStereoMatcher():
     def free_images(self):
         del self.images
 
-    def run_from_memory(self, images, background_masks=None, dump_ply_files=False):
+    def run_from_memory(self, images, foreground_masks=None, dump_ply_files=False):
         """ Perform stereo reconstruction on a set of images already in memory, and return results in memory. 
-        background_masks: an optional array of binary images where values >0 indicate regions of each image
-        that are certainly in the background.
+        foreground_masks: an optional array of binary images where values >0 indicate regions of each image
+        that are certainly in the foreground. They MUST be aligned with images.
         """
         assert self.all_camera_parameters is not None, 'Camera parameters not loaded yet; You should run load_all_camera_parameters first!'
 
@@ -296,12 +296,12 @@ class OpenCVStereoMatcher():
                                              left_maps[1], remap_interpolation)
             right_image_rectified = cv2.remap(right_image, right_maps[0],
                                               right_maps[1], remap_interpolation)
-            if background_masks is not None:
-                left_background_rectified = cv2.remap(
-                    background_masks[left_index], left_maps[0], left_maps[1],
+            if foreground_masks is not None:
+                left_foreground_mask_rectified = cv2.remap(
+                    foreground_masks[left_index], left_maps[0], left_maps[1],
                     cv2.INTER_NEAREST)
                 #right_background_rectified = cv2.remap(
-                    #background_masks[right_index], right_maps[0], right_maps[1],
+                    #foreground_masks[right_index], right_maps[0], right_maps[1],
                     #cv2.INTER_NEAREST)
                 # TODO: We don't actually filter using the right background mask yet
 
@@ -328,13 +328,15 @@ class OpenCVStereoMatcher():
                 pylab.imshow(numpy.vstack((im,)))
                 pylab.show()
                 #continue
-            # Filter the stereo correspondences based on the background_masks.
-            if background_masks is not None:
-                DISPARITY_SHIFT_16S = 4
-                MinDisparity = self.options['StereoMatcher']['MinDisparity']
-                filtered_sentinel = (MinDisparity - 1) << DISPARITY_SHIFT_16S # Match what opencv is using.
-                disparity_image[left_background_rectified>0] = filtered_sentinel
-                # TODO: Maybe something could be gained by filtering on the right image as well...
+
+            ## Filter the stereo correspondences based on the foreground_masks, before they're expanded to 3D
+            #if foreground_masks is not None:
+                #DISPARITY_SHIFT_16S = 4
+                #MinDisparity = self.options['StereoMatcher']['MinDisparity']
+                #filtered_sentinel = (MinDisparity - 1) << DISPARITY_SHIFT_16S # Match what opencv is supposed to be using.
+                #assert numpy.all(disparity_image.shape==left_foreground_mask_rectified.shape), 'Bug! Shape mismatch!'
+                #disparity_image[left_foreground_mask_rectified==0] = filtered_sentinel # DEBUG
+                ## TODO: Maybe something could be gained by filtering on the right image as well...
 
             # Convert the depth map to a point cloud
             Q = self.Q_array[pair_index]
@@ -347,11 +349,22 @@ class OpenCVStereoMatcher():
             #pylab.show()
             #continue
 
+            ## Do the filtering after the expansion since I can't get the sentinel to work properly.
+            #if foreground_masks is not None:
+                #xyz[left_foreground_mask_rectified==0] = 10000.0 
+                ## TODO: Maybe something could be gained by filtering on the right image as well...
+
+
             # Put the 3D images in a unified coordinate system...
             xyz = threedeeimage.reshape((-1,3)) # x,y,z now in three columns, in left rectified camera coordinates
 
             z = xyz[:,2]
-            goodz = z < 9999.0
+            #z[left_foreground_mask_rectified==0] = 10000.0 # background filtering
+            if foreground_masks is None:
+                goodz = z < 9999.0 # Just filter out the points OpenCV already labeled as matching failures
+            else:
+                # Also filter out points in the background in the left camera
+                goodz = numpy.logical_and(z < 9999.0,left_foreground_mask_rectified.reshape(-1)>0.0000001)
             xyz_filtered = xyz[goodz,:]
             #print('pixels before filtering: ',h*w, "after filtering:" ,xyz_filtered.shape[0] )
 

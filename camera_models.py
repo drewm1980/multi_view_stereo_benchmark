@@ -124,6 +124,23 @@ def undistort_image_halcon_division_no_lut(im, pixel_h, pixel_w, cx, cy, kappa):
             output_image[vi, ui] = intensity
     return output_image
 
+def undistort_images(distorted_images, all_camera_parameters):
+    """ Undistort several images. """
+    # TODO try parallelizing? See background_subtraction for futures example.
+    undistorted_images = []
+    for i in range(len(distorted_images)):
+        assert all_camera_parameters[i]['model']=='halcon_area_scan_division', 'Only halcon division model supported for undistortion, currently!'
+        distorted_image = distorted_images[i]
+        kappa = all_camera_parameters[i]['kappa']
+        cx = all_camera_parameters[i]['cx']
+        cy = all_camera_parameters[i]['cy']
+        pixel_h = all_camera_parameters[i]['pixel_h']
+        pixel_w = all_camera_parameters[i]['pixel_w']
+        undistorted_image = undistort_image_halcon_division_no_lut(distorted_image, pixel_h, pixel_w, cx, cy, kappa)
+        undistorted_images.append(undistorted_image)
+    return undistorted_images
+
+
 def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
                         cy, kappa=None):
     """ Project a 3D point into a sensor plane and
