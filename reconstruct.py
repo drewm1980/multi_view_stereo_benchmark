@@ -15,12 +15,14 @@ allOptionNames = []
 allOptionsDict = {}
 
 # Enable PMVS reconstruction
-from .reconstruct_pmvs2 import run_pmvs, pmvsOptionNames, pmvsOptionsDict
+import multi_view_stereo_benchmark # You probably need to add this to your PYTHONPATH!
+
+from multi_view_stereo_benchmark.reconstruct_pmvs2 import run_pmvs, pmvsOptionNames, pmvsOptionsDict
 allOptionNames += pmvsOptionNames
 allOptionsDict.update(pmvsOptionsDict)
 
 # Enable OpenCV reconstruction
-from .reconstruct_opencv import run_opencv, opencvOptionNames, opencvOptionsDict
+from multi_view_stereo_benchmark.reconstruct_opencv import run_opencv, opencvOptionNames, opencvOptionsDict
 allOptionNames += opencvOptionNames
 allOptionsDict.update(opencvOptionsDict)
 
@@ -31,7 +33,7 @@ def generate_missing_reconstructions(imagesPath: Path,
                                      optionNames=allOptionNames,
                                      optionsDict=allOptionsDict,
                                      destFileNames=destFileNames):
-    for optionName in optionNames:
+    for optionName in allOptionNames:
         destFileName = destFileNames[optionName]
         if not (reconstructionsPath / destFileName).is_file():
             print('Running reconstruction configuration: ', optionName)

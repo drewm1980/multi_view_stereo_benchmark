@@ -56,8 +56,14 @@ At the time of writing you can ignore that.
 1. Build the reconstruction algorithms by running bootstrap.sh. See extern/README.md for details.
 
 ## Running
-1. Run `./reconstruct.py` to generate all of the point cloud reconstructions
-1. Run `./benchmark.py` to perform all of point cloud comparisons and output the benchmark results
+1. Run ipython3 (or just ipython if you have a conda 3 environment enabled) in the multi_view_stereo_benchmark directory
+1. type `cd ..`
+1. type `import multi_view_stereo_benchmark`
+1. type `cd multi_view_stereo_benchmark`
+1. type `run reconstruct.py` to generate all of the point cloud reconstructions
+1. type `run benchmark.py` to perform all of point cloud comparisons and output the benchmark results
+
+Note: If you're having import path problems, you're not alone. Read http://python-notes.curiousefficiency.org/en/latest/python_concepts/import_traps.html and double-check that you followed the above steps exactly. 
 
 ## FAQ
 
