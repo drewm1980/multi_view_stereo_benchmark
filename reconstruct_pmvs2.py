@@ -110,10 +110,10 @@ class PMVS2Options():
         """
     def __init__(self,
                  numCameras,
-                 level=1, # 0 is full resolution
+                 level=2, # 0 is full resolution
                  csize=2, # cell size
-                 threshold=0.6,
-                 wsize=7, # colors
+                 threshold=0.5,
+                 wsize=8, # window size
                  minImageNum=2,
                  #CPU=8, # For a quad core with hyperthreading
                  #CPU=20, # For a 20 core with hyperthreading
@@ -189,7 +189,7 @@ def write_vis_file_ring(numCameras,numNeighbors=1,visFilePath=Path('vis.dat')):
                 fd.write(str(neighbor_camera) + ' ')
             fd.write('\n')
 
-def write_vis_file_sphere(numCameras, visFilePath=None, destPath=None):
+def write_vis_file_sphere(numCameras, visFilePath=None, destPath=None, match_between_pairs=True):
     """ Generate a vis.dat file that pmvs2 expects for a camera with 
         cameras arranged in stereo pairs.
         Can also work for a ring as a special case, but there would be no matching between the pairs.
@@ -208,14 +208,40 @@ def write_vis_file_sphere(numCameras, visFilePath=None, destPath=None):
     with visFilePath.open('w') as fd:
         fd.write('VISDATA\n')
         fd.write(str(numCameras)+'\n')
-        for pair_index in range(int(numCameras/2)):
-            center_camera = pair_index * 2 # Left camera index
-            numNeighbors=1
-            fd.write(str(center_camera)+' ')
-            fd.write(str(numNeighbors)+' ')
-            neighbor_camera = center_camera+1 # Right camera index
-            fd.write(str(neighbor_camera) + ' ')
-            fd.write('\n')
+        if match_between_pairs:
+            #above_pairings = ((1,8),(2,7),(3,12),(4,11),(5,10),(6,9)) # one based camera indeces
+            above_pairings = ((0,7),(1,6),(2,11),(3,10),(4,9),(5,8)) # zero based camera indeces
+            below_pairings = ( # Manually re-order by camera index
+                    (6,1),
+                    (7,0),
+                    (8,5),
+                    (9,4),
+                    (10,3),
+                    (11,2),
+                    ) 
+            for camera_index in range(numCameras):
+                fd.write(str(camera_index)+' ')
+                numNeighbors=3
+                fd.write(str(numNeighbors)+' ')
+                if camera_index < 6:
+                    fd.write(str((camera_index-1)%6)+' ')
+                    fd.write(str((camera_index+1)%6)+' ')
+                    fd.write(str(above_pairings[camera_index][1])+' ')
+                else:
+                    fd.write(str((camera_index-6-1)%6+6)+' ')
+                    fd.write(str((camera_index-6+1)%6+6)+' ')
+                    fd.write(str(below_pairings[camera_index-6][1])+' ')
+                fd.write('\n')
+        else:
+            for camera_index in range(numCameras):
+                fd.write(str(camera_index)+' ')
+                numNeighbors=1
+                fd.write(str(numNeighbors)+' ')
+                if camera_index%2==0:
+                    fd.write(str(camera_index+1)+' ')
+                else:
+                    fd.write(str(camera_index-1)+' ')
+                fd.write('\n')
 
 def set_up_pmvs_tree(images=None, all_camera_parameters=None, inputPath=None, destPath=None, options=None):
     """ Set up a PMVS style file tree in destPath.
@@ -372,7 +398,7 @@ class PMVS2StereoMatcher():
         # TODO I didn't do good bookkeeping yet in the database for the topology.
         # There should be a list of sensible matching topologies in all_camera_parameters,
         # and it shoud be added to the on-disk format.
-        write_vis_file_sphere(self.num_cameras, destPath=work_directory)
+        write_vis_file_sphere(self.num_cameras, destPath=work_directory, match_between_pairs=True)
 
     def run_from_memory(self, images, foreground_masks=None, dump_ply_files=False):
         """

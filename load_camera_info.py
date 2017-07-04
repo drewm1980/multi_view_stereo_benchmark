@@ -83,7 +83,7 @@ def load_intrinsics(filePath):
             filePath -- The name of the file to read
         Output:
             The 3x3 camera projection matrix K, distortion coefficients, image width, and image height
-            x_pixel_homogeneous = K*x_world
+            x_pixel_homogeneous = K*x_camera_frame
         """
     d = load_halcon_intrinsics(filePath)
     cameraMatrix = numpy.zeros([3, 3])
