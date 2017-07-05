@@ -129,3 +129,10 @@ def load_ply(filename, enableCaching=True):
     assert data.shape[0]==expected_vertices, 'Ply file corrupted! Inconsistent number of vertices!'
     assert data.shape[0] > 0, 'Ply file did not contain any points!'
     return data, columnnames, columntypes
+
+def load_ply_just_xyz(plyFilePath):
+    """ A specialization that just returns the points """
+    data, columnnames, columntypes = load_ply(plyFilePath)
+    assert columnnames[0:3] == ['x', 'y', 'z']
+    xyz = data[:, 0:3].copy() # Just in case some other code needs a dense array.
+    return xyz
