@@ -122,17 +122,16 @@ def load_ply(filename, enableCaching=True):
         data = numpy.load(file=str(plyCachedPath))
     else:
         data = numpy.loadtxt(fname=filename,skiprows=header_lines)
-        if enableCaching:
-            #print("Pickle non-existent or older than .ply file; regenerating it!")
-            numpy.save(arr=data,file=str(plyCachedPath))
+        #print("Pickle non-existent or older than .ply file; regenerating it!")
+        numpy.save(arr=data,file=str(plyCachedPath))
 
     assert data.shape[0]==expected_vertices, 'Ply file corrupted! Inconsistent number of vertices!'
     assert data.shape[0] > 0, 'Ply file did not contain any points!'
     return data, columnnames, columntypes
 
-def load_ply_just_xyz(plyFilePath):
+def load_ply_just_xyz(plyFilePath, enableCaching=None):
     """ A specialization that just returns the points """
-    data, columnnames, columntypes = load_ply(plyFilePath)
+    data, columnnames, columntypes = load_ply(plyFilePath,enableCaching=enableCaching)
     assert columnnames[0:3] == ['x', 'y', 'z']
     xyz = data[:, 0:3].copy() # Just in case some other code needs a dense array.
     return xyz
