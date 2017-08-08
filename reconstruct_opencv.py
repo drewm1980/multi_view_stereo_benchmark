@@ -122,12 +122,12 @@ topologies['skipping_2'] = tuple(zip((0,4,8),
 
 class OpenCVStereoMatcher():
     """ Wrapper class that applies OpenCV's stereo matchers pairwise on an array of cameras. 
-        Usage: Re-instantiate each time the camera geometry changes with a new calibrationsPath.
+        Usage: Re-instantiate each time the camera geometry changes with a new calibration_path.
             For each reconstruction, call either run_from_memory or run_from_disk depending on your use case.
     """
     def __init__(self,
             options=DefaultOptionsBM,
-            calibrationsPath=None,
+            calibration_path=None,
             all_camera_parameters=None,
             visual_debug=False,
             ):
@@ -136,10 +136,10 @@ class OpenCVStereoMatcher():
         self.topology = options['CameraArray']['topology']
         self.visual_debug = visual_debug
 
-        assert (calibrationsPath is None) != (all_camera_parameters is None), "Please pass exactly one of all_camera_parameters or calibrationsPath!"
-        if calibrationsPath is not None:
+        assert (calibration_path is None) != (all_camera_parameters is None), "Please pass exactly one of all_camera_parameters or calibration_path!"
+        if calibration_path is not None:
             from .load_camera_info import load_all_camera_parameters
-            self.all_camera_parameters = load_all_camera_parameters(calibrationsPath)
+            self.all_camera_parameters = load_all_camera_parameters(calibration_path)
         if all_camera_parameters is not None:
             self.all_camera_parameters = all_camera_parameters
 
@@ -403,7 +403,7 @@ class OpenCVStereoMatcher():
 
     def run_from_disk(self,
                       imagesPath,
-                      calibrationsPath=None,
+                      calibration_path=None,
                       destDir=None,
                       destFile=None,
                       options = None,
@@ -426,8 +426,8 @@ class OpenCVStereoMatcher():
 
         self.load_images(imagesPath)
 
-        if calibrationsPath is not None:
-            self.load_all_camera_parameters(calibrationsPath)
+        if calibration_path is not None:
+            self.load_all_camera_parameters(calibration_path)
 
         # By default, work in a temporary directory.
         # "with...as" ensures the temp directory is cleared even if there is an error below.
@@ -458,7 +458,7 @@ class OpenCVStereoMatcher():
 
 def run_opencv(imagesPath, destDir=None, destFile=None, options=None, workDirectory=None, runtimeFile=None, visual_debug=False):
     """ An inefficent, but simple interface that doesn't precompute anything, and loads from disk. """
-    matcher = OpenCVStereoMatcher(options=options, calibrationsPath=imagesPath, visual_debug=visual_debug)
+    matcher = OpenCVStereoMatcher(options=options, calibration_path=imagesPath, visual_debug=visual_debug)
     matcher.run_from_disk(imagesPath=imagesPath,
                           destDir=destDir,
                           destFile=destFile,

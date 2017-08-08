@@ -135,7 +135,7 @@ referencePath = Path('data') / 'reference_reconstructions' / widget / 'reference
 referenceCloud = load_ply(referencePath)[0][:, :3].astype(numpy.float32)
 
 # Load the images once.
-temp_matcher = OpenCVStereoMatcher(calibrationsPath=imagesPath)
+temp_matcher = OpenCVStereoMatcher(calibration_path=imagesPath)
 temp_matcher.load_images(imagesPath)
 images = temp_matcher.images
 del temp_matcher
@@ -164,7 +164,7 @@ def f(parametersTuple):
     options = unmangle_tuples_to_nested_dict(zip(parameterNames,parametersTuple))
     #pretty_print_options(options)
 
-    matcher = OpenCVStereoMatcher(options=options, calibrationsPath=imagesPath)
+    matcher = OpenCVStereoMatcher(options=options, calibration_path=imagesPath)
 
     try:
         xyz, reconstruction_time = matcher.run_from_memory(images)

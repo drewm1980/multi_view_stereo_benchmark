@@ -358,20 +358,20 @@ def run_pmvs(imagesPath, destDir=None, destFile=None, options=None, workDirector
 
 class PMVS2StereoMatcher():
     """ Wrapper class that calls PMVS2 on an array of cameras
-        Usage: Re-instantiate each time the camera geometry changes with a new calibrationsPath.
+        Usage: Re-instantiate each time the camera geometry changes with a new calibration_path.
             For each reconstruction, call either run_from_memory or run_from_disk depending on your use case.
     """
     def __init__(self,
             options=None,
-            calibrationsPath=None,
+            calibration_path=None,
             all_camera_parameters=None,
             work_directory=Path('pmvs2_work_directory'),
             ):
 
-        assert (calibrationsPath is None) != (all_camera_parameters is None), "Please pass exactly one of all_camera_parameters or calibrationsPath!"
-        if calibrationsPath is not None:
+        assert (calibration_path is None) != (all_camera_parameters is None), "Please pass exactly one of all_camera_parameters or calibration_path!"
+        if calibration_path is not None:
             from .load_camera_info import load_all_camera_parameters
-            self.all_camera_parameters = load_all_camera_parameters(calibrationsPath)
+            self.all_camera_parameters = load_all_camera_parameters(calibration_path)
         if all_camera_parameters is not None:
             self.all_camera_parameters = all_camera_parameters
 

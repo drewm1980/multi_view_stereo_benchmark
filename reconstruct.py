@@ -29,13 +29,13 @@ allOptionsDict.update(opencvOptionsDict)
 destFileNames = {optionName:optionName+'.ply' for optionName in allOptionNames}
 
 def generate_missing_reconstructions(imagesPath: Path,
-                                     reconstructionsPath: Path=Path('.'),
+                                     reconstructions_path: Path=Path('.'),
                                      optionNames=allOptionNames,
                                      optionsDict=allOptionsDict,
                                      destFileNames=destFileNames):
     for optionName in allOptionNames:
         destFileName = destFileNames[optionName]
-        if not (reconstructionsPath / destFileName).is_file():
+        if not (reconstructions_path / destFileName).is_file():
             print('Running reconstruction configuration: ', optionName)
             if 'pmvs' in optionName:
                 run = run_pmvs
@@ -44,7 +44,7 @@ def generate_missing_reconstructions(imagesPath: Path,
             else:
                 assert False, "Couldn't figure out which algorithm to run from the name of the options!"
             run(imagesPath=imagesPath,
-                     destDir=reconstructionsPath,
+                     destDir=reconstructions_path,
                      options=optionsDict[optionName],
                      destFile=destFileNames[optionName])
 
@@ -61,7 +61,7 @@ def do_reconstructions_for_the_benchmark(sourceDir=Path('data/undistorted_images
         destPath = destDir / objectid
         if not destPath.is_dir():
             destPath.mkdir()
-        generate_missing_reconstructions(imagesPath=objectPath,reconstructionsPath=destPath)
+        generate_missing_reconstructions(imagesPath=objectPath,reconstructions_path=destPath)
         
 
 if __name__=='__main__':
