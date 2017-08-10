@@ -82,6 +82,8 @@ Input formats in the benchmark:
 1. middlebury format, coded but not tested at all yet
 1. HALCON camera calibration formats are used internally
 
+WARNING! As far as I know, I'm the only user of this code. I regularly push accidentally broken versions to my public master branch during development, often in response to changing requirements of external non-public code. I can make tested snapshots on request.
+
 ## Licensing
 
 The code for the benchmark itself is developed commercially by Robovision Integrated Solutons NV, and shared under the MIT license. See LICENSE.txt for the standard details. We shared it online to simplify some of our collaborations with partners. If you use it and like it, tell everyone how awesome we are. If you use it and hate it, tell nobody!
