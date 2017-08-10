@@ -152,7 +152,7 @@ def rodriguez_vector_to_SO3(a1,a2,a3, implementation='giplib'):
         return scipy.linalg.expm(skew)
 
 
-def load_halcon_extrinsics_rodriguez(filePath):
+def load_halcon_intrinsics_ascii(filePath):
     """ Load directly from HALCON's ascii format for camera extrinsics.
         HALCON supports 12 different rotation parameterizations.
         As a result, their write_pose function writes ascii files that
@@ -196,6 +196,8 @@ def load_halcon_extrinsics_rodriguez(filePath):
         # gba euler angles. R = Rx * Ry * Rz
         from numpy import sin,cos,pi
         rx,ry,rz = anglevector[0], anglevector[1], anglevector[2] # Still in radians
+        # Check HALCON's definitions for Rx, Ry, Rz here: 
+        #http://www.mvtec.com/doc/halcon/13/en/hom_mat3d_rotate.html
         Rx = numpy.matrix([[1,0,0],
                         [0,cos(rx),-sin(rx)],
                         [0,sin(rx),cos(rx)]])
@@ -205,10 +207,13 @@ def load_halcon_extrinsics_rodriguez(filePath):
         Rz = numpy.matrix([[cos(rz),-sin(rz),0],
                         [sin(rz),cos(rz),0],
                         [0,0,1]])
+
+        # Check HALCON's gba rotation order here by "Representation of Orientation":
+        # http://www.mvtec.com/doc/halcon/13/en/create_pose.html
         R = numpy.array(Rx*Ry*Rz) # Matrix multiplication
         T = d['t']
         #print('R=',R,'T=',T)
-        #R,T = R.T,numpy.dot(-R.T,T) # Invert the transform so it maps world to camera
+        #R,T = R.T,numpy.dot(-R.T,T) # Invert the transform
     else:
         assert False, "Sorry, rotation parameterization "+str(rotation_parameterization_code)+"not handled yet!"
     # This will be needed for codes 4,5,12, and 13
@@ -249,7 +254,7 @@ def load_extrinsics(filePath):
     for line in lines:
         if 'Rotation angles [deg] or Rodriguez vector:' in line:
             #print('Rodriquez type HALCON extrinsics file detected!')
-            return load_halcon_extrinsics_rodriguez(filePath)
+            return load_halcon_intrinsics_ascii(filePath)
     #print('Homogeneous type HALCON extrinsics file detected!')
     return load_halcon_extrinsics_homogeneous(filePath)
 
@@ -295,7 +300,7 @@ def load_all_camera_parameters(calibration_path, throw_error_if_radial_distortio
         R, T = load_extrinsics(extrinsicsFilePath)
 
         # OpenCV and PMVS2 expect the inverse of the transform that HALCON exports!
-        R,T = R.T,numpy.dot(-R.T,T)
+        R,T = R.T,numpy.dot(-R.T,T) # R,T, now map world coorinates into camera coordinates
         camera_parameters = {'camera_matrix':camera_matrix, 'R':R, 'T':T, 'image_width':image_width, 'image_height':image_height, 'f':f}
         camera_parameters.update(distortion_coefficients)
         all_camera_parameters.append(camera_parameters)
