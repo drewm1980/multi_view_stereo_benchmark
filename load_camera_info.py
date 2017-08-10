@@ -82,7 +82,7 @@ def load_intrinsics(filePath):
         Input:
             filePath -- The name of the file to read
         Output:
-            The 3x3 camera projection matrix K, distortion coefficients, image width, and image height
+            The 3x3 camera projection matrix K, distortion coefficients, image width, image height, and focal length
             x_pixel_homogeneous = K*x_camera_frame
         """
     d = load_halcon_intrinsics(filePath)
@@ -116,7 +116,7 @@ def load_intrinsics(filePath):
     distCoeffs['cy'] = cy
     distCoeffs['pixel_w'] = d['Sx']
     distCoeffs['pixel_h'] = d['Sy']
-    return cameraMatrix, distCoeffs, d['ImageWidth'], d['ImageHeight']
+    return cameraMatrix, distCoeffs, d['ImageWidth'], d['ImageHeight'], d['Focus']
 
 
 def rodriguez_vector_to_SO3(a1,a2,a3, implementation='giplib'):
@@ -277,7 +277,7 @@ def load_all_camera_parameters(calibration_path, throw_error_if_radial_distortio
         intrinsicsFilePath = calibration_path / (intrinsics_pattern % (i + 1))
         print('Loading intrinsics for camera',i,'from',intrinsicsFilePath,'...')
         assert intrinsicsFilePath.is_file(), "Couldn't find camera intrinsics in "+str(intrinsicsFilePath)
-        camera_matrix, distortion_coefficients, image_width, image_height = load_intrinsics(intrinsicsFilePath)
+        camera_matrix, distortion_coefficients, image_width, image_height, f = load_intrinsics(intrinsicsFilePath)
         if throw_error_if_radial_distortion:
             # The images must already be radially undistorted
             if distortion_coefficients['model'] == 'halcon_area_scan_polynomial':
@@ -296,7 +296,7 @@ def load_all_camera_parameters(calibration_path, throw_error_if_radial_distortio
 
         # OpenCV and PMVS2 expect the inverse of the transform that HALCON exports!
         R,T = R.T,numpy.dot(-R.T,T)
-        camera_parameters = {'camera_matrix':camera_matrix, 'R':R, 'T':T, 'image_width':image_width, 'image_height':image_height}
+        camera_parameters = {'camera_matrix':camera_matrix, 'R':R, 'T':T, 'image_width':image_width, 'image_height':image_height, 'f':f}
         camera_parameters.update(distortion_coefficients)
         all_camera_parameters.append(camera_parameters)
     return all_camera_parameters # List of dictionaries

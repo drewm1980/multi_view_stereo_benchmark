@@ -372,7 +372,7 @@ class PMVS2StereoMatcher():
         if calibration_path is not None:
             from .load_camera_info import load_all_camera_parameters
             self.all_camera_parameters = load_all_camera_parameters(calibration_path)
-        if all_camera_parameters is not None:
+        else:
             self.all_camera_parameters = all_camera_parameters
 
         self.num_cameras = len(all_camera_parameters)
