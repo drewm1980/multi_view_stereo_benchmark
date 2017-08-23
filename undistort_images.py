@@ -11,6 +11,8 @@ import mvs
 from mvs import lookup_monochrome as lookup_monochrome_python
 lookup_monochrome = jit(lookup_monochrome_python)
 
+from .camera_models import distort_division
+
 @jit(cache=True)
 #def undistort_image_slow(im, pixel_h, pixel_w, cx, cy, k1,k2,k3,p1,p2):
 def undistort_image_halcon_division_no_lut(im, pixel_h, pixel_w, cx, cy, kappa):

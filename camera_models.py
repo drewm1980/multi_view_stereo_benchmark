@@ -15,11 +15,11 @@ from numba import jit
 halcon_model_types = ['area_scan_division', 'area_scan_polynomial']
 
 def undistort_division(u_tilde, v_tilde, kappa):
-    """ 
+    """
     From the HALCON Docs:
-    
+
     The division model uses one parameter () to model the radial distortions.
-    
+
     The following equations transform the distorted image plane coordinates into undistorted image plane coordinates if the division model is used """
     r_tilde_squared = u_tilde**2 + v_tilde**2
     scaling = 1.0 / (1.0 + kappa * r_tilde_squared)
@@ -47,16 +47,16 @@ def distort_division(u, v, kappa):
 def undistort_halcon_polynomial(u_tilde, v_tilde, k1, k2, k3, p1, p2):
     """
     From the HALCON Docs:
-    The polynomial model uses three parameters () to model 
-    the radial distortions and two parameters () to model 
+    The polynomial model uses three parameters () to model
+    the radial distortions and two parameters () to model
     the decentering distortions.
 
-    The following equations transform the distorted image 
-    plane coordinates into undistorted image plane coordinates 
+    The following equations transform the distorted image
+    plane coordinates into undistorted image plane coordinates
     if the polynomial model is used:
 
-    These equations cannot be inverted analytically. Therefore, 
-    distorted image plane coordinates must be calculated from 
+    These equations cannot be inverted analytically. Therefore,
+    distorted image plane coordinates must be calculated from
     undistorted image plane coordinates numerically.
 
     k1=k2=k3=p1=p2=0 means no distortion.
@@ -66,8 +66,8 @@ def undistort_halcon_polynomial(u_tilde, v_tilde, k1, k2, k3, p1, p2):
     r_to_2 = u_tilde_to_2 + v_tilde_to_2
     r_to_4 = r_to_2**2
     r_to_6 = r_to_4 * r_to_2
-    temp1 =  k1 * r_to_2 
-    temp1 += k2 * r_to_4 
+    temp1 =  k1 * r_to_2
+    temp1 += k2 * r_to_4
     temp1 += k3 * r_to_6
     u = u_tilde + u_tilde * temp1  # the radial part
     v = v_tilde + v_tilde * temp1
@@ -82,9 +82,28 @@ def distort_halcon_polynomial(u,v,k1,k2,k3,p1,p2):
     assert False, "Not implemented yet. Requires iterative solution"
     return u_tilde,v_tilde
 
+def project_and_distort_simple(point_3d, camera_parameters):
+    """ Simplified api that takes a 3d point, applies extrinsics, intrinsics,
+    and radial distortion to return a 2d image point corresponding to a 3d point.
+    This implementation is not for speed critical use; see project_and_distort. """
+    R = camera_parameters['R']
+    T = camera_parameters['T']
+    kappa = camera_parameters['kappa']
+    f_mm = camera_parameters['f'] * 1000.0 # Because project_and_distort takes mm
+    image_height = camera_parameters['image_height']
+    image_width = camera_parameters['image_width']
+    pixel_h_mm = camera_parameters['pixel_h'] * 1000.0
+    pixel_w_mm = camera_parameters['pixel_w'] * 1000.0
+    cx = camera_parameters['cx']
+    cy = camera_parameters['cy']
+    x,y,z = numpy.dot(R,point_3d) + T
+    assert z*1000.0 > f_mm, 'A voxel is behind the image plane of a camera!'
+    u, v = project_and_distort(x, y, z, f_mm, image_height, image_width,
+                               pixel_h_mm, pixel_w_mm, cx, cy, kappa)
+    return u,v
 
 @jit
-def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
+def project_and_distort(x, y, z, f_mm, sensor_h, sensor_w, pixel_h_mm, pixel_w_mm, cx,
                         cy, kappa):
     """ Project a 3D point into a sensor plane and
     simulate lens distortion to get (sub)pixel coordinates.
@@ -96,15 +115,15 @@ def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
     but there exist other conventions, so be careful!. i.e. HALCON's radial distortion is applied
     to coordinates in the image plane (in m); I have seen other groups do radal distortion on the
     pixel coordinates.
-    
+
     Inputs:
     x,y,z - real world coordinates in the camera frame. Scale doesn't matter.
-    f - focal length of the lens in mm! This is to be consistent with giplib.
+    f_mm - focal length of the lens in mm! This is to be consistent with giplib.
     sensor_h,sensor_w - height and width of the sensor in pixels
     pixel_h,pixel_w - height and width of a sensor pixel in mm! This is to be consistent with giplib.
     cx,cy - the center of the sensor optical axis in pixels
     kappa - the division model radial distortion parameter as defined by halcon.  """
-    f_meters = f * 0.001
+    f_meters = f_mm * 0.001
     x_projected = x * f_meters / z
     y_projected = y * f_meters / z
     # z_projected = f_meters
@@ -113,15 +132,15 @@ def project_and_distort(x, y, z, f, sensor_h, sensor_w, pixel_h, pixel_w, cx,
     u = x_projected
     v = y_projected
     #if kappa != 0.0 and kappa != -0.0:
-        #print('Non-zero Kappa! Applying radial distortion!')
-        #u_tilde, v_tilde = distort_division(u, v, kappa)
+    #print('Non-zero Kappa! Applying radial distortion!')
+    #u_tilde, v_tilde = distort_division(u, v, kappa)
     #else:
-        #u_tilde, v_tilde = u, v
+    #u_tilde, v_tilde = u, v
     u_tilde, v_tilde = distort_division(u, v, kappa)
 
     # Convert to pixel (sub) coordinates
-    u_pixel = u_tilde / (pixel_w * .001) + cx
-    v_pixel = v_tilde / (pixel_h * .001) + cy
+    u_pixel = u_tilde / (pixel_w_mm * .001) + cx
+    v_pixel = v_tilde / (pixel_h_mm * .001) + cy
 
     #assert False
 
