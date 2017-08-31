@@ -113,7 +113,7 @@ def project_and_distort(x, y, z, f_mm, sensor_h, sensor_w, pixel_h_mm, pixel_w_m
 
     Note that the definition of the projection/distortion process is consistent with HALCON,
     but there exist other conventions, so be careful!. i.e. HALCON's radial distortion is applied
-    to coordinates in the image plane (in m); I have seen other groups do radal distortion on the
+    to coordinates in the image plane (in m); I have seen other groups do radial distortion on the
     pixel coordinates.
 
     Inputs:
@@ -145,6 +145,49 @@ def project_and_distort(x, y, z, f_mm, sensor_h, sensor_w, pixel_h_mm, pixel_w_m
     #assert False
 
     return u_pixel, v_pixel
+
+def triangulate(camera_point_tuples):
+    """ Takes (camera parameters, 2d point) tuples and computes the closest
+        3d point to the viewing rays. 
+        This is solves the inverse problem of project_and_distort_simple."""
+    points_on_the_lines = []
+    direction_vectors = []
+    assert(len(camera_point_tuples)) >= 2, 'There are not enough points to triangulate!'
+    for camera_parameters,(u_pixel,v_pixel) in camera_point_tuples:
+        # Extract two points per ray in world coordinates.
+        R = camera_parameters['R'] # R,T, map world coorinates into camera coordinates
+        T = camera_parameters['T']
+        R_,T_ = R.T,numpy.dot(-R.T,T) # map camera coordinates into world coordinates
+        kappa = camera_parameters['kappa']
+        f_m = camera_parameters['f'] # Because project_and_distort takes mm
+        image_height = camera_parameters['image_height']
+        image_width = camera_parameters['image_width']
+        pixel_h_m = camera_parameters['pixel_h']
+        pixel_w_m = camera_parameters['pixel_w']
+        cx = camera_parameters['cx']
+        cy = camera_parameters['cy']
+        u_tilde = (u_pixel - cx) * pixel_w_m
+        v_tilde = (v_pixel - cy) * pixel_h_m
+        u,v = undistort_division(u_tilde, v_tilde, kappa)
+        #point1_camera = numpy.array([0,0,0])
+        point1_world = camera_center = T_ # in world coordinates since R_*[[0],[0],[0]] + T_ = T_
+        point2_camera = numpy.array((u,v,f_m))
+        point2_world = numpy.dot(R_,point2_camera)+T_
+        direction_world = point2_world - point1_world
+        points_on_the_lines.append(point1_world)
+        direction_vectors.append(direction_world)
+    from plaroma3d.camera_geometry import point_closest_to_several_lines
+    point_3d_world = point_closest_to_several_lines(points=points_on_the_lines,
+                                              directions=direction_vectors)
+    point_to_line_distances = []
+    for p,d in zip(points_on_the_lines, direction_vectors):
+        n = d / numpy.linalg.norm(d) # normalized direction
+        point_3d_p = point_3d_world - p # center on a point on the line
+        # To compute distance, consider right triangle formed by the projection...
+        distance = numpy.sqrt(numpy.dot(point_3d_p,point_3d_p) - (numpy.dot(point_3d_p,n))**2) 
+        point_to_line_distances.append(distance)
+        
+    return point_3d_world, point_to_line_distances
 
 
 # Check division model invertibility for a specific camera
