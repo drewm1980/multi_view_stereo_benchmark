@@ -273,8 +273,7 @@ def load_all_camera_parameters(calibration_path, throw_error_if_radial_distortio
         intrinsics_pattern = 'intrinsics_camera%02i.txt'
         extrinsics_pattern = 'extrinsics_camera%02i.txt'
     if num_cameras == 0:
-        print('calibration_path:',calibration_path)
-        assert False, "Couldn't make sense of the filenames for the camera calibrations..."
+        assert False, "Couldn't make sense of the filenames for the camera calibrations in "+str(calibration_path.absolute())
         
     all_camera_parameters = []
     for i in range(num_cameras):
