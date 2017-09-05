@@ -16,3 +16,7 @@ working_directory_pmvs
 data
 *.pyc
 *.so
+extern
+.cache
+data_pixelscanner
+working_directory_opencv
