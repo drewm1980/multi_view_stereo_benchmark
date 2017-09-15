@@ -14,6 +14,7 @@ from numba import jit
 
 halcon_model_types = ['area_scan_division', 'area_scan_polynomial']
 
+@jit
 def undistort_division(u_tilde, v_tilde, kappa):
     """
     From the HALCON Docs:
@@ -34,6 +35,9 @@ def distort_division(u, v, kappa):
 
     These equations can be inverted analytically, which leads to the following equations that transform undistorted coordinates into distorted coordinates:
     kappa = 0 means no distortion.
+
+    Warning! The units of u,v and kappa must be compatible!
+    My understanding is that HALCON Kappa works with u,v in meters!
     """
     r_squared = u**2 + v**2
     temp = 1.0 - 4.0 * kappa * r_squared
@@ -124,22 +128,22 @@ def project_and_distort(x, y, z, f_mm, sensor_h, sensor_w, pixel_h_mm, pixel_w_m
     cx,cy - the center of the sensor optical axis in pixels
     kappa - the division model radial distortion parameter as defined by halcon.  """
     f_meters = f_mm * 0.001
-    x_projected = x * f_meters / z
+    x_projected = x * f_meters / z # meters
     y_projected = y * f_meters / z
     # z_projected = f_meters
 
     # Apply radial distortion in the image plane
-    u = x_projected
+    u = x_projected # meters
     v = y_projected
     #if kappa != 0.0 and kappa != -0.0:
     #print('Non-zero Kappa! Applying radial distortion!')
     #u_tilde, v_tilde = distort_division(u, v, kappa)
     #else:
     #u_tilde, v_tilde = u, v
-    u_tilde, v_tilde = distort_division(u, v, kappa)
+    u_tilde, v_tilde = distort_division(u, v, kappa) # meters
 
     # Convert to pixel (sub) coordinates
-    u_pixel = u_tilde / (pixel_w_mm * .001) + cx
+    u_pixel = u_tilde / (pixel_w_mm * .001) + cx # pixels
     v_pixel = v_tilde / (pixel_h_mm * .001) + cy
 
     #assert False
@@ -166,9 +170,9 @@ def triangulate(camera_point_tuples):
         pixel_w_m = camera_parameters['pixel_w']
         cx = camera_parameters['cx']
         cy = camera_parameters['cy']
-        u_tilde = (u_pixel - cx) * pixel_w_m
+        u_tilde = (u_pixel - cx) * pixel_w_m # meters
         v_tilde = (v_pixel - cy) * pixel_h_m
-        u,v = undistort_division(u_tilde, v_tilde, kappa)
+        u,v = undistort_division(u_tilde, v_tilde, kappa) # meters
         #point1_camera = numpy.array([0,0,0])
         point1_world = camera_center = T_ # in world coordinates since R_*[[0],[0],[0]] + T_ = T_
         point2_camera = numpy.array((u,v,f_m))
