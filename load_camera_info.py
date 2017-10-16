@@ -86,18 +86,18 @@ def load_intrinsics(filePath):
             x_pixel_homogeneous = K*x_camera_frame
         """
     d = load_halcon_intrinsics(filePath)
-    cameraMatrix = numpy.zeros([3, 3])
+    camera_matrix = numpy.zeros([3, 3])
 
     fx = d['Focus'] / d['Sx']
     fy = d['Focus'] / d['Sy']
-    cameraMatrix[0, 0] = fx
-    cameraMatrix[1, 1] = fy
+    camera_matrix[0, 0] = fx
+    camera_matrix[1, 1] = fy
 
     cx = d['Cx']
     cy = d['Cy']
-    cameraMatrix[0, 2] = cx
-    cameraMatrix[1, 2] = cy
-    cameraMatrix[2, 2] = 1.0
+    camera_matrix[0, 2] = cx
+    camera_matrix[1, 2] = cy
+    camera_matrix[2, 2] = 1.0
 
     if 'Poly5' in d:
         k1 = d['Poly1']
@@ -112,11 +112,11 @@ def load_intrinsics(filePath):
         distCoeffs['model'] = 'halcon_area_scan_division'
     else:
         distCoeffs = ()
-    distCoeffs['cx'] = cx  # Note: these are also in the cameraMatrix, but are also used when compensating radial distortion
+    distCoeffs['cx'] = cx  # Note: these are also in the camera_matrix, but are also used when compensating radial distortion
     distCoeffs['cy'] = cy
     distCoeffs['pixel_w'] = d['Sx']
     distCoeffs['pixel_h'] = d['Sy']
-    return cameraMatrix, distCoeffs, d['ImageWidth'], d['ImageHeight'], d['Focus']
+    return camera_matrix, distCoeffs, d['ImageWidth'], d['ImageHeight'], d['Focus']
 
 
 def rodriguez_vector_to_SO3(a1,a2,a3, implementation='giplib'):

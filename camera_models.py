@@ -21,7 +21,11 @@ def undistort_division(u_tilde, v_tilde, kappa):
 
     The division model uses one parameter () to model the radial distortions.
 
-    The following equations transform the distorted image plane coordinates into undistorted image plane coordinates if the division model is used """
+    The following equations transform the distorted image plane coordinates into undistorted image plane coordinates if the division model is used. 
+    
+    u_tilde and v_tilde are in camera coordinates, usually in meters, at a distance of one focal length
+    from the center of projection.
+    """
     r_tilde_squared = u_tilde**2 + v_tilde**2
     scaling = 1.0 / (1.0 + kappa * r_tilde_squared)
     u = scaling * u_tilde
